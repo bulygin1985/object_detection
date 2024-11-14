@@ -22,8 +22,8 @@ jobs:
 
     - name: Run Black
       run: |
-        black --check . # replace with your directory or add more options as needed
+        black --check --diff . # replace with your directory or add more options as needed
 
     - name: Run isort
       run: |
-        isort --check-only . # replace with your directory or add more options as needed
+        isort --check-only --diff . # replace with your directory or add more options as needed
