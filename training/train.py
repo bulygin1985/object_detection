@@ -63,11 +63,11 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     mode="min",
     factor=0.2,
-    patience=7,
+    patience=100,
     threshold=1e-4,
     threshold_mode="rel",
     cooldown=1,
-    min_lr=1e-6,
+    min_lr=3e-3,
 )
 
 model.train(True)
@@ -105,4 +105,4 @@ while True:
 
     epoch += 1
 
-torch.save(model.state_dict(), "../models/checkpoints/pretrained_weights.pt")
+torch.save(model.state_dict(), "../models/checkpoints/tmp_pretrained_weights.pt")
