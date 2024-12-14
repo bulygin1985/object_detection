@@ -1,0 +1,104 @@
+{
+  "model_param": {
+    "parent": "root",
+    "mode": "train",
+    "image_size": [256, 256, 3],
+    "feature_extractor": {
+      "parent": "model_param",
+      "type": "Backbone",
+      "alpha": 0.25,
+      "filters": [64, 128, 256, 512, 512],
+      "input_channels": 3
+    },
+    "head": {
+      "parent": "model_param",
+      "type": "Head",
+      "classes_number": 20,
+      "connection_num": 3,
+      "filters": [128, 64, 32]
+    }
+  },
+  "train_param": {
+    "parent": "root",
+    "batch_size": 32,
+    "max_epochs": 10000,
+    "optimizer": {
+      "parent": "train_param",
+      "optimizer_type": "Adam",
+      "lr_rate": 0.03
+    },
+    "lr_scheduler": {
+      "parent": "train_param",
+      "type": "ReduceLROnPlateau",
+      "mode": "min",
+      "factor": 0.2,
+      "patience": 7,
+      "threshold": 1e-4,
+      "threshold_mode": "rel",
+      "cooldown": 1,
+      "min_lr": 1e-6
+    },
+    "loss": {
+      "parent": "train_param",
+      "type": "CenternetTTFLoss",
+      "reg_loss": "l1",
+      "lambda_size": 0.1,
+      "lambda_cls": 1.0
+    },
+    "preprocessing": {
+      "parent": "train_param",
+      "input_size": {
+        "parent": "preprocessing",
+        "height": 256,
+        "width": 256,
+        "channels": 3
+      },
+      "normalization": {
+        "parent": "preprocessing",
+        "mean": 0.0,
+        "std": 0.5
+      }
+    },
+    "transforms": {
+      "parent": "train_param",
+      "sequence": [
+        {
+          "parent": "transforms",
+          "type": "Resize",
+          "params": {
+            "parent": "Resize",
+            "size": [256, 256]
+          }
+        },
+        {
+          "parent": "transforms",
+          "type": "ToImage",
+          "params": {
+            "parent": "ToImage"
+          }
+        },
+        {
+          "parent": "transforms",
+          "type": "ToDtype",
+          "params": {
+            "parent": "ToDtype",
+            "dtype": "float32",
+            "scale": true
+          }
+        }
+      ]
+    },
+    "run_mode": {
+      "parent": "train_param",
+      "mode_type": "train",
+      "overfit_settings": {
+        "parent": "run_mode",
+        "enabled": false,
+        "num_images": 10,
+        "target_loss": 1.0,
+        "learning_rate": 0.05,
+        "batch_size": 10
+      }
+    }
+  }
+}
