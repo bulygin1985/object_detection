@@ -36,22 +36,29 @@ training_data = torch_dataset
 lr = 0.03
 batch_size = 32
 
-
-def criteria_satisfied(_, current_epoch):
-    if current_epoch >= 10000:
-        return True
-    return False
-
-
 if overfit:
+    tag = "overfit"
     training_data = torch.utils.data.Subset(torch_dataset, range(10))
     lr = 0.05
     batch_size = 10
+    min_lr = 2e-3
+    patience = 100
+    stop_loss = 1.0
+    stop_epoch = None
+else:
+    tag = ""
+    min_lr = 1e-5
+    patience = 7
+    stop_loss = None
+    stop_epoch = 500
 
-    def criteria_satisfied(current_loss, _):
-        if current_loss < 1.0:
-            return True
-        return False
+
+def criteria_satisfied(current_loss, current_epoch):
+    if stop_loss is not None and current_loss < 1.0:
+        return True
+    if stop_epoch is not None and current_epoch > stop_epoch:
+        return True
+    return False
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -59,15 +66,16 @@ model = ModelBuilder(alpha=0.25).to(device)
 
 parameters = list(model.parameters())
 optimizer = torch.optim.Adam(parameters, lr=lr)
+
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     mode="min",
-    factor=0.2,
-    patience=7,
+    factor=0.5,
+    patience=patience,
     threshold=1e-4,
     threshold_mode="rel",
     cooldown=1,
-    min_lr=1e-6,
+    min_lr=min_lr,
 )
 
 model.train(True)
@@ -83,7 +91,7 @@ while True:
     print("EPOCH {}:".format(epoch))
 
     loss_dict = {}
-    for _, data in enumerate(batch_generator):
+    for i, data in enumerate(batch_generator):
         input_data, gt_data = data
         input_data = input_data.to(device).contiguous()
 
@@ -95,14 +103,14 @@ while True:
         loss_dict["loss"].backward()
 
         optimizer.step()
+        loss = loss_dict["loss"].item()
+        print(f"Batch {i}, loss={loss}, lr={scheduler.get_last_lr()}")
 
-        print(loss_dict["loss"])
-
-    if criteria_satisfied(loss_dict["loss"], epoch):
+    if criteria_satisfied(loss, epoch):
         break
 
     scheduler.step(loss_dict["loss"])
 
     epoch += 1
 
-torch.save(model.state_dict(), "../models/checkpoints/pretrained_weights.pt")
+torch.save(model.state_dict(), f"../models/checkpoints/pretrained_weights_{tag}.pt")
