@@ -15,8 +15,10 @@ args = parser.parse_args()
 
 overfit = args.overfit
 
+image_set = "train"
+
 dataset_val = torchvision.datasets.VOCDetection(
-    root="../VOC", year="2007", image_set="train", download=False
+    root="../VOC", year="2007", image_set=image_set, download=False
 )
 
 transform = transforms.Compose(
@@ -35,6 +37,7 @@ torch_dataset = Dataset(dataset=dataset_val, transformation=transform, encoder=e
 training_data = torch_dataset
 lr = 0.03
 batch_size = 32
+patience = 7
 
 
 def criteria_satisfied(_, current_epoch):
@@ -44,14 +47,19 @@ def criteria_satisfied(_, current_epoch):
 
 
 if overfit:
-    training_data = torch.utils.data.Subset(torch_dataset, range(10))
-    lr = 0.05
-    batch_size = 10
+    subset_len = 10
+    training_data = torch.utils.data.Subset(torch_dataset, range(subset_len))
+    batch_size = subset_len
+    patience = 50
+    image_set = "val"
 
     def criteria_satisfied(current_loss, _):
-        if current_loss < 1.0:
+        if current_loss < 100.0:
             return True
         return False
+
+
+print(f"Selected image_set: {image_set}")
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,18 +70,18 @@ optimizer = torch.optim.Adam(parameters, lr=lr)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     mode="min",
-    factor=0.2,
-    patience=7,
+    factor=0.1,
+    patience=patience,
     threshold=1e-4,
     threshold_mode="rel",
     cooldown=1,
-    min_lr=1e-6,
+    min_lr=1e-2,
 )
 
 model.train(True)
 
 batch_generator = torch.utils.data.DataLoader(
-    training_data, num_workers=4, batch_size=batch_size, shuffle=True
+    training_data, num_workers=0, batch_size=batch_size, shuffle=False
 )
 
 epoch = 1
@@ -95,8 +103,8 @@ while True:
         loss_dict["loss"].backward()
 
         optimizer.step()
-
-        print(loss_dict["loss"])
+        loss = loss_dict["loss"]
+        print(f" loss={loss}, lr={scheduler.get_last_lr()}")
 
     if criteria_satisfied(loss_dict["loss"], epoch):
         break
