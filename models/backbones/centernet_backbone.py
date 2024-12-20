@@ -3,8 +3,10 @@ from collections import OrderedDict
 import numpy as np
 import torch.nn as nn
 
+from .abstract_backbone import AbstractBackbone
 
-class Backbone(nn.Module):
+
+class Backbone(AbstractBackbone):
     def __init__(self, alpha=1.0):
         super().__init__()
         self.block_num = 1
