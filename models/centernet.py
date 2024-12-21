@@ -13,10 +13,16 @@ class ModelBuilder(nn.Module):
     To connect head with backbone
     """
 
-    def __init__(self, alpha=1.0, class_number=20, backbone: str = "default"):
+    def __init__(
+        self,
+        alpha=1.0,
+        class_number=20,
+        backbone: str = "default",
+        bb_weights: str = None,
+    ):
         super().__init__()
         self.class_number = class_number
-        self.backbone = create_bakbone(backbone, alpha)
+        self.backbone = create_bakbone(backbone, alpha, bb_weights)
         self.head = Head(
             backbone_output_filters=self.backbone.filters, class_number=class_number
         )
