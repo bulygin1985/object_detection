@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import torch.nn as nn
 
 
-class AbstractBackbone(nn.Module, ABC):
+class AbstractBackbone(nn.Module):
 
     @abstractmethod
     def forward(self, x):
