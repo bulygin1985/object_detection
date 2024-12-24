@@ -5,6 +5,7 @@ import torchvision
 import torchvision.transforms.v2 as transforms
 from torch.utils import data
 
+from callbacks.model_save import SaveBestModelCallback
 from data.dataset import Dataset
 from models.centernet import ModelBuilder, input_height, input_width
 from training.encoder import CenternetEncoder
@@ -68,12 +69,20 @@ print(f"Selected image_set: {image_set}")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ModelBuilder(alpha=0.25).to(device)
 
+save_callback = SaveBestModelCallback(
+    save_dir="../callbacks/checkpoints",
+    metric_name="loss",
+    greater_is_better=False,
+    start_saving_threshold=5.0,
+    min_improvement=0.5,
+)
+
 parameters = list(model.parameters())
 optimizer = torch.optim.Adam(parameters, lr=lr)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     mode="min",
-    factor=0.5,
+    factor=0.8,
     patience=patience,
     threshold=1e-4,
     threshold_mode="rel",
@@ -107,6 +116,11 @@ while True:
 
         optimizer.step()
         loss = loss_dict["loss"]
+
+        save_callback.on_eval_epoch_end(
+            model=model, optimizer=optimizer, epoch=epoch, current_metric=loss.item()
+        )
+
         print(f" loss={loss}, lr={scheduler.get_last_lr()}")
 
     if criteria_satisfied(loss_dict["loss"], epoch):
