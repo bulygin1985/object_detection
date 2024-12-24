@@ -4,8 +4,8 @@ import torch
 import torchvision
 import torchvision.transforms.v2 as transforms
 from torch.utils import data
-from callbacks.model_save import SaveBestModelCallback
 
+from callbacks.model_save import SaveBestModelCallback
 from data.dataset import Dataset
 from models.centernet import ModelBuilder, input_height, input_width
 from training.encoder import CenternetEncoder
@@ -74,7 +74,7 @@ save_callback = SaveBestModelCallback(
     metric_name="loss",
     greater_is_better=False,
     start_saving_threshold=5.0,
-    min_improvement=0.5
+    min_improvement=0.5,
 )
 
 parameters = list(model.parameters())
@@ -118,10 +118,7 @@ while True:
         loss = loss_dict["loss"]
 
         save_callback.on_eval_epoch_end(
-            model=model,
-            optimizer=optimizer,
-            epoch=epoch,
-            current_metric=loss.item()
+            model=model, optimizer=optimizer, epoch=epoch, current_metric=loss.item()
         )
 
         print(f" loss={loss}, lr={scheduler.get_last_lr()}")

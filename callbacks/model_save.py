@@ -1,16 +1,17 @@
-from pytorch_accelerated.callbacks import TrainerCallback
-import torch
 import os
+
+import torch
+from pytorch_accelerated.callbacks import TrainerCallback
 
 
 class SaveBestModelCallback(TrainerCallback):
     def __init__(
-            self,
-            save_dir: str,
-            metric_name: str = "loss",
-            greater_is_better: bool = False,
-            start_saving_threshold: float = None,
-            min_improvement: float = 0.0
+        self,
+        save_dir: str,
+        metric_name: str = "loss",
+        greater_is_better: bool = False,
+        start_saving_threshold: float = None,
+        min_improvement: float = 0.0,
     ):
         """
         Args:
@@ -30,9 +31,9 @@ class SaveBestModelCallback(TrainerCallback):
         self.start_saving_threshold = start_saving_threshold
         self.min_improvement = min_improvement
 
-        self.best_metric = float('inf')
+        self.best_metric = float("inf")
         if greater_is_better:
-            self.best_metric = float('-inf')
+            self.best_metric = float("-inf")
 
         os.makedirs(save_dir, exist_ok=True)
 
@@ -64,8 +65,7 @@ class SaveBestModelCallback(TrainerCallback):
             self._clean_old_checkpoints()
 
             save_path = os.path.join(
-                self.save_dir,
-                f"best_model_{self.metric_name}_{current_metric:.4f}.pt"
+                self.save_dir, f"best_model_{self.metric_name}_{current_metric:.4f}.pt"
             )
 
             torch.save(model.state_dict(), save_path)
