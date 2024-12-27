@@ -1,2 +1,5 @@
 VOC/
 __pycache__/
+.idea/
+models/checkpoints/*.pt
+

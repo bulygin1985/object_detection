@@ -25,8 +25,11 @@ args = parser.parse_args()
 
 overfit = args.overfit
 
+
+image_set = "val" if overfit else "train"
+
 dataset_val = torchvision.datasets.VOCDetection(
-    root="../VOC", year="2007", image_set="train", download=False
+    root="../VOC", year="2007", image_set=image_set, download=False
 )
 
 transform = transforms.Compose(
@@ -45,14 +48,17 @@ torch_dataset = Dataset(dataset=dataset_val, transformation=transform, encoder=e
 training_data = torch_dataset
 lr = 0.03
 batch_size = 32
+patience = 7
+min_lr = 1e-3
 
 if overfit:
     tag = "overfit"
-    training_data = torch.utils.data.Subset(torch_dataset, range(10))
-    lr = 0.05
-    batch_size = 10
-    min_lr = 2e-3
+    subset_len = 10
+    training_data = torch.utils.data.Subset(torch_dataset, range(subset_len))
+    batch_size = subset_len
+    lr = 5e-2
     patience = 100
+    min_lr = 2e-3
     stop_loss = 1.0
     stop_epoch = None
 else:
@@ -71,6 +77,9 @@ def criteria_satisfied(current_loss, current_epoch):
     return False
 
 
+print(f"Selected image_set: {image_set}")
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 alpha = 0.25
 if args.backbone and args.backbone != "default":
@@ -82,7 +91,6 @@ model = model.to(device)
 
 parameters = list(model.parameters())
 optimizer = torch.optim.Adam(parameters, lr=lr)
-
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer,
     mode="min",
@@ -97,15 +105,13 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 model.train(True)
 
 batch_generator = torch.utils.data.DataLoader(
-    training_data, num_workers=4, batch_size=batch_size, shuffle=True
+    training_data, num_workers=0, batch_size=batch_size, shuffle=False
 )
 
 epoch = 1
 get_desired_loss = False
 
 while True:
-    print("EPOCH {}:".format(epoch))
-
     loss_dict = {}
     for i, data in enumerate(batch_generator):
         input_data, gt_data = data
@@ -120,19 +126,19 @@ while True:
 
         optimizer.step()
         loss = loss_dict["loss"].item()
-        print(
-            f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={scheduler.get_last_lr()}"
-        )
+
+        curr_lr = scheduler.get_last_lr()[0]
+        print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
     if criteria_satisfied(loss, epoch):
         break
 
     scheduler.step(loss_dict["loss"])
-
     epoch += 1
 
-train_location = path.dirname(path.abspath(__file__))
-checkpoints_dir = path.join(train_location, "../models/checkpoints")
+checkpoints_dir = "models/checkpoints"
 tail = f"_{tag}" if tag else ""
 checkpoint_filename = path.join(checkpoints_dir, f"pretrained_weights{tail}.pt")
-torch.save(model.state_dict(), checkpoint_filename)
+train_location = path.dirname(path.abspath(__file__))
+torch.save(model.state_dict(), path.join(train_location, "..", checkpoint_filename))
+print(f"Saved model checkpoint to {checkpoint_filename}")

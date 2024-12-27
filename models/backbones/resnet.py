@@ -5,7 +5,7 @@ from .abstract_backbone import AbstractBackbone
 
 class ResnetBackbone(AbstractBackbone):
     def __init__(self, model: models.ResNet):
-        super().__init__()        
+        super().__init__()
         self.model = model
         self.filters = [64, 64, 128, 256, 512]
 
