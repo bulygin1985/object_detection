@@ -23,7 +23,6 @@ class ResnetBackbone(AbstractBackbone):
             layer_out_width(layer)
             for layer in [model.layer1, model.layer2, model.layer3, model.layer4]
         ]
-        print(self.filters)
 
     def forward(self, x):
         # https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
