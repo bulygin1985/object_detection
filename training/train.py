@@ -129,7 +129,6 @@ while True:
 
         optimizer.step()
         loss = loss_dict["loss"].item()
-
         curr_lr = scheduler.get_last_lr()[0]
         print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
