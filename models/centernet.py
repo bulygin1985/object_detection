@@ -18,11 +18,11 @@ class ModelBuilder(nn.Module):
         alpha=1.0,
         class_number=20,
         backbone: str = "default",
-        bb_weights: str = None,
+        backbone_weights: str = None,
     ):
         super().__init__()
         self.class_number = class_number
-        self.backbone = create_bakbone(backbone, alpha, bb_weights)
+        self.backbone = create_bakbone(backbone, alpha, backbone_weights)
         self.head = Head(
             backbone_output_filters=self.backbone.filters, class_number=class_number
         )
