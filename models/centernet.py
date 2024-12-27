@@ -1,7 +1,7 @@
 import torch.nn as nn
 
 from losses.centernet_ttf import CenternetTTFLoss
-from models.backbones import create_bakbone
+from models.backbones import create_backbone
 from models.centernet_head import Head
 
 # todo (AA): move it somewhere
@@ -22,7 +22,7 @@ class ModelBuilder(nn.Module):
     ):
         super().__init__()
         self.class_number = class_number
-        self.backbone = create_bakbone(backbone, alpha, backbone_weights)
+        self.backbone = create_backbone(backbone, alpha, backbone_weights)
         self.head = Head(
             backbone_output_filters=self.backbone.filters, class_number=class_number
         )

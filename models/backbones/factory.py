@@ -2,7 +2,7 @@ from .centernet_backbone import Backbone
 from .resnet import create_resnet_backbone
 
 
-def create_bakbone(backbonename: str, alpha: float, weights: str = None):
+def create_backbone(backbonename: str, alpha: float, weights: str = None):
     if not backbonename or backbonename == "default":
         assert not weights
         return Backbone(alpha)

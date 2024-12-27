@@ -1,1 +1,1 @@
-from .factory import create_bakbone
+from .factory import create_backbone
