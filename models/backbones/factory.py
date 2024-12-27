@@ -1,6 +1,6 @@
 from .centernet_backbone import Backbone
-from .resnet import create_resnet_backbone
 from .mobilenetv2 import create_mobilenetv2_backbone
+from .resnet import create_resnet_backbone
 
 
 def create_backbone(backbonename: str, alpha: float, weights: str = None):
