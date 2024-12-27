@@ -16,7 +16,7 @@ parser.add_argument(
     "-b",
     "--backbone",
     type=str,
-    help="Backbone name. Supported backbones: '', default, resnetXX.",
+    help="Backbone name. Supported backbones: '', default, resnetXX, mobilenet_v2.",
 )
 parser.add_argument(
     "-bw",
