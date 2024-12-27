@@ -12,6 +12,15 @@ from training.encoder import CenternetEncoder
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-o", "--overfit", action="store_true", help="overfit to 10 images")
+parser.add_argument(
+    "-b", "--backbone", type=str, help="Backbone name (empty, default, resnetXX,)"
+)
+parser.add_argument(
+    "-bw",
+    "--backbone_weights",
+    type=str,
+    help="Backbone weights for supported pretrained backbones",
+)
 args = parser.parse_args()
 
 overfit = args.overfit
@@ -63,7 +72,13 @@ def criteria_satisfied(current_loss, current_epoch):
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = ModelBuilder(alpha=0.25).to(device)
+alpha = 0.25
+if args.backbone and args.backbone != "default":
+    alpha = 1.0
+model = ModelBuilder(
+    alpha=alpha, backbone=args.backbone, backbone_weights=args.backbone_weights
+)
+model = model.to(device)
 
 parameters = list(model.parameters())
 optimizer = torch.optim.Adam(parameters, lr=lr)
