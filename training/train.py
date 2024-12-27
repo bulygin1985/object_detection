@@ -13,7 +13,10 @@ from training.encoder import CenternetEncoder
 parser = argparse.ArgumentParser()
 parser.add_argument("-o", "--overfit", action="store_true", help="overfit to 10 images")
 parser.add_argument(
-    "-b", "--backbone", type=str, help="Backbone name (empty, default, resnetXX,)"
+    "-b",
+    "--backbone",
+    type=str,
+    help="Backbone name. Supported backbones: '', default, resnetXX.",
 )
 parser.add_argument(
     "-bw",
