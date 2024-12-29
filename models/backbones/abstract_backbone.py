@@ -4,6 +4,11 @@ import torch.nn as nn
 
 
 class AbstractBackbone(nn.Module):
+    """
+    Backbone should implement forward method returning features at different strides.
+    The class should also have filters member (list) with number of channels for each model
+    ouput.
+    """
 
     @abstractmethod
     def forward(self, x):
