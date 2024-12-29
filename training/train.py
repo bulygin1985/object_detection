@@ -49,8 +49,10 @@ dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
 torch_dataset = Dataset(dataset=dataset_val, transformation=transform, encoder=encoder)
 
 training_data = torch_dataset
-lr = 0.1
-batch_size = 128
+lr = 0.03
+batch_size = 32
+patience = 7
+min_lr = 1e-3
 
 if overfit:
     tag = "overfit"
@@ -65,7 +67,7 @@ if overfit:
 else:
     tag = ""
     min_lr = 1e-5
-    patience = 5
+    patience = 7
     stop_loss = None
     stop_epoch = 100
 
@@ -106,7 +108,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 model.train(True)
 
 batch_generator = torch.utils.data.DataLoader(
-    training_data, num_workers=4, batch_size=batch_size, shuffle=False
+    training_data, num_workers=0, batch_size=batch_size, shuffle=False
 )
 
 epoch = 1
