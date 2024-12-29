@@ -42,9 +42,9 @@ class EfficientNetBackbone(AbstractBackbone):
     def __init__(self, model: models.ResNet):
         super().__init__()
         self.model = model
-        layers_no, channels_count = get_stride_features_and_filters_en(model)
+        layers_no, filters_count = get_stride_features_and_filters_en(model)
         self.stride_features_no = layers_no
-        self.filters = channels_count
+        self.filters = filters_count
 
     def forward(self, x):
         # https://github.com/pytorch/vision/blob/main/torchvision/models/efficientnet.py
