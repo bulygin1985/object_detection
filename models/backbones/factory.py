@@ -1,4 +1,4 @@
-from .centernet_backbone import Backbone
+from .default_backbone import Backbone
 from .efficientnet import create_efficientnet_backbone
 from .mobilenetv2 import create_mobilenetv2_backbone
 from .resnet import create_resnet_backbone
