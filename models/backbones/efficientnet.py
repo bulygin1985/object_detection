@@ -23,7 +23,7 @@ def layer_props_en(layer):
         return 0, 0
 
 
-def get_stride_features_and_channels_en(model):
+def get_stride_features_and_filters_en(model):
     output_number = []
     nchannels = []
     for n, feature in enumerate(model.features):
@@ -42,7 +42,7 @@ class EfficientNetBackbone(AbstractBackbone):
     def __init__(self, model: models.ResNet):
         super().__init__()
         self.model = model
-        layers_no, channels_count = get_stride_features_and_channels_en(model)
+        layers_no, channels_count = get_stride_features_and_filters_en(model)
         self.stride_features_no = layers_no
         self.filters = channels_count
 

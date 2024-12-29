@@ -3,16 +3,16 @@ import torchvision.models as models
 from .abstract_backbone import AbstractBackbone
 
 
-def layer_out_width(resnet_layer):
+def layer_out_filters(resnet_layer):
     lastblock = resnet_layer[-1]
     if isinstance(lastblock, models.resnet.BasicBlock):
-        width = lastblock.conv2.weight.shape[0]
+        filters = lastblock.conv2.weight.shape[0]
     elif isinstance(lastblock, models.resnet.Bottleneck):
-        width = lastblock.conv3.weight.shape[0]
+        filters = lastblock.conv3.weight.shape[0]
     if lastblock.downsample is not None:
         print("downsample")
-        width = width // 2
-    return width
+        filters = filters // 2
+    return filters
 
 
 class ResnetBackbone(AbstractBackbone):
@@ -20,7 +20,7 @@ class ResnetBackbone(AbstractBackbone):
         super().__init__()
         self.model = model
         self.filters = [64] + [
-            layer_out_width(layer)
+            layer_out_filters(layer)
             for layer in [model.layer1, model.layer2, model.layer3, model.layer4]
         ]
 

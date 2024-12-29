@@ -9,32 +9,32 @@ from .abstract_backbone import AbstractBackbone
 def layer_props(layer):
     if isinstance(layer, torchvision.ops.Conv2dNormActivation):
         # print('Conv2dNormActivation', layer[0].weight.shape, layer[0].stride)
-        input_width = layer[0].weight.shape[1]
+        input_filters = layer[0].weight.shape[1]
         stride = layer[0].stride[0]
-        return input_width, stride
+        return input_filters, stride
     elif isinstance(layer, torch.nn.Conv2d):
         # print('Conv2d', layer.weight.shape, layer.stride)
         return layer.weight.shape[1], layer.stride[0]
     elif isinstance(layer, InvertedResidual):
         # expect
-        input_width = layer.conv[0][0].weight.shape[1]
+        input_filters = layer.conv[0][0].weight.shape[1]
         stride = 1
         for nestedlayer in layer.conv:
             _, nested_stride = layer_props(nestedlayer)
             stride = max(stride, nested_stride)
-        return input_width, stride
+        return input_filters, stride
     else:
         return 0, 0
 
 
-def get_stride_features_and_channels(model):
+def get_stride_features_and_filters(model):
     output_number = []
     nchannels = []
     for n, feature in enumerate(model.features):
-        input_width, stride = layer_props(feature)
+        input_filters, stride = layer_props(feature)
         if stride == 2:
             output_number.append(n)
-            nchannels.append(input_width)
+            nchannels.append(input_filters)
         # print('----')
     # assume that the very last feature layer (channel expansion to 1280)
     # actually creates features for classification and is redundant
@@ -47,7 +47,7 @@ class MobileNetV2Backbone(AbstractBackbone):
     def __init__(self, model: models.ResNet):
         super().__init__()
         self.model = model
-        layers_no, channels_count = get_stride_features_and_channels(model)
+        layers_no, channels_count = get_stride_features_and_filters(model)
         self.stride_features_no = layers_no
         self.filters = channels_count
 
