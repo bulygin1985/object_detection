@@ -4,6 +4,7 @@ import torch
 import torchvision
 import torchvision.transforms.v2 as transforms
 from torch.utils import data
+from callbacks.tensorboard_callback import TensorBoardCallback
 
 from data.dataset import Dataset
 from models.centernet import ModelBuilder, input_height, input_width
@@ -87,33 +88,69 @@ batch_generator = torch.utils.data.DataLoader(
     training_data, num_workers=0, batch_size=batch_size, shuffle=False
 )
 
+tensorboard_callback = TensorBoardCallback(
+    model_name="centernet",  # або інша назва моделі
+    experiment_name=None,  # автоматично створить timestamp
+    log_every_n_steps=10,
+    log_images_every_n_epochs=1
+)
+
+hparams = {
+    "learning_rate": lr,
+    "batch_size": batch_size,
+    "patience": patience,
+    "min_lr": min_lr,
+    "alpha": model.alpha if hasattr(model, 'alpha') else None,
+}
+tensorboard_callback.log_hyperparameters(hparams)
+
+tensorboard_callback.log_model_graph(
+    model,
+    input_size=(batch_size, 3, input_height, input_width)
+)
+
 epoch = 1
 get_desired_loss = False
 
 while True:
     print("EPOCH {}:".format(epoch))
+    epoch_losses = []
 
-    loss_dict = {}
-    for _, data in enumerate(batch_generator):
+    for batch_idx, data in enumerate(batch_generator):
         input_data, gt_data = data
         input_data = input_data.to(device).contiguous()
-
         gt_data = gt_data.to(device)
         gt_data.requires_grad = False
 
         loss_dict = model(input_data, gt=gt_data)
-        optimizer.zero_grad()  # compute gradient and do optimize step
+        optimizer.zero_grad()
         loss_dict["loss"].backward()
-
         optimizer.step()
-        loss = loss_dict["loss"]
-        print(f" loss={loss}, lr={scheduler.get_last_lr()}")
+
+        # Логуємо метрики батчу
+        tensorboard_callback.on_train_batch_end(
+            batch_idx,
+            loss_dict,
+            model,
+            optimizer
+        )
+
+        epoch_losses.append(loss_dict["loss"].item())
+        print(f" loss={loss_dict['loss']}, lr={scheduler.get_last_lr()}")
+
+    # Логуємо метрики епохи
+    avg_epoch_loss = sum(epoch_losses) / len(epoch_losses)
+    tensorboard_callback.on_epoch_end(
+        epoch,
+        model,
+        avg_epoch_loss,
+        input_data  # Передаємо останній батч для візуалізації
+    )
 
     if criteria_satisfied(loss_dict["loss"], epoch):
         break
 
     scheduler.step(loss_dict["loss"])
-
     epoch += 1
 
 torch.save(model.state_dict(), "../models/checkpoints/pretrained_weights.pt")
