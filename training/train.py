@@ -12,6 +12,18 @@ from training.encoder import CenternetEncoder
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-o", "--overfit", action="store_true", help="overfit to 10 images")
+parser.add_argument(
+    "-b",
+    "--backbone",
+    type=str,
+    help="Backbone name. Supported backbones: '', default, resnetXX, mobilenet_v2.",
+)
+parser.add_argument(
+    "-bw",
+    "--backbone_weights",
+    type=str,
+    help="Backbone weights for supported pretrained backbones",
+)
 args = parser.parse_args()
 
 overfit = args.overfit
@@ -37,10 +49,8 @@ dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
 torch_dataset = Dataset(dataset=dataset_val, transformation=transform, encoder=encoder)
 
 training_data = torch_dataset
-lr = 0.03
-batch_size = 32
-patience = 7
-min_lr = 1e-3
+lr = 0.1
+batch_size = 128
 
 if overfit:
     tag = "overfit"
@@ -55,15 +65,15 @@ if overfit:
 else:
     tag = ""
     min_lr = 1e-5
-    patience = 7
+    patience = 5
     stop_loss = None
-    stop_epoch = 500
+    stop_epoch = 100
 
 
 def criteria_satisfied(current_loss, current_epoch):
     if stop_loss is not None and current_loss < 1.0:
         return True
-    if stop_epoch is not None and current_epoch > stop_epoch:
+    if stop_epoch is not None and current_epoch >= stop_epoch:
         return True
     return False
 
@@ -72,7 +82,13 @@ print(f"Selected image_set: {image_set}")
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = ModelBuilder(alpha=0.25).to(device)
+alpha = 0.25
+if args.backbone and args.backbone != "default":
+    alpha = 1.0
+model = ModelBuilder(
+    alpha=alpha, backbone=args.backbone, backbone_weights=args.backbone_weights
+)
+model = model.to(device)
 
 parameters = list(model.parameters())
 optimizer = torch.optim.Adam(parameters, lr=lr)
@@ -90,7 +106,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 model.train(True)
 
 batch_generator = torch.utils.data.DataLoader(
-    training_data, num_workers=0, batch_size=batch_size, shuffle=False
+    training_data, num_workers=4, batch_size=batch_size, shuffle=False
 )
 
 epoch = 1
@@ -122,6 +138,8 @@ while True:
 
 checkpoints_dir = "models/checkpoints"
 tail = f"_{tag}" if tag else ""
+if args.backbone:
+    tail += "_" + args.backbone
 checkpoint_filename = path.join(checkpoints_dir, f"pretrained_weights{tail}.pt")
 train_location = path.dirname(path.abspath(__file__))
 torch.save(model.state_dict(), path.join(train_location, "..", checkpoint_filename))
