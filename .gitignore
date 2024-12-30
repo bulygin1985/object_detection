@@ -2,4 +2,4 @@ VOC/
 __pycache__/
 .idea/
 models/checkpoints/*.pt
-
+training/runs
