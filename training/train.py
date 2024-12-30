@@ -30,11 +30,13 @@ dataset_val = torchvision.datasets.VOCDetection(
     root="../VOC", year="2007", image_set=image_set, download=False
 )
 
-transform = transforms.Compose([
-    transforms.Resize(size=(input_width, input_height)),
-    transforms.ToImage(),
-    transforms.ToDtype(torch.float32, scale=True),
-])
+transform = transforms.Compose(
+    [
+        transforms.Resize(size=(input_width, input_height)),
+        transforms.ToImage(),
+        transforms.ToDtype(torch.float32, scale=True),
+    ]
+)
 
 encoder = CenternetEncoder(input_height, input_width)
 dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
@@ -88,15 +90,12 @@ save_callback = SaveBestModelCallback(
 tensorboard_callback = AdvancedTensorBoardCallback(
     log_dir="runs",
     experiment_name=f"centernet_{'overfit_' if overfit else ''}{time.strftime('%Y%m%d_%H%M%S')}",
-    enabled_features=['metrics', 'histograms', 'gradients', 'weights']
+    enabled_features=["metrics", "histograms", "gradients", "weights"],
 )
 
 # Налаштування DataLoader
 batch_generator = torch.utils.data.DataLoader(
-    training_data,
-    num_workers=0,
-    batch_size=batch_size,
-    shuffle=False
+    training_data, num_workers=0, batch_size=batch_size, shuffle=False
 )
 
 # Початок тренування
@@ -139,18 +138,20 @@ while epoch <= max_epochs:
 
         # Логування метрик батча
         batch_metrics = {
-            'batch_loss': loss_dict["loss"].item(),
-            'batch_heatmap_loss': loss_dict.get("heatmap_loss", 0),
-            'batch_size_loss': loss_dict.get("size_loss", 0),
-            'batch_offset_loss': loss_dict.get("offset_loss", 0),
+            "batch_loss": loss_dict["loss"].item(),
+            "batch_heatmap_loss": loss_dict.get("heatmap_loss", 0),
+            "batch_size_loss": loss_dict.get("size_loss", 0),
+            "batch_offset_loss": loss_dict.get("offset_loss", 0),
         }
         tensorboard_callback.log_batch_metrics(batch_metrics, batch_idx, epoch)
 
         # Прогрес
         if batch_idx % 100 == 0:
-            print(f"Batch [{batch_idx}/{total_batches}], "
-                  f"Loss: {loss_dict['loss']:.4f}, "
-                  f"LR: {scheduler.get_last_lr()[0]:.6f}")
+            print(
+                f"Batch [{batch_idx}/{total_batches}], "
+                f"Loss: {loss_dict['loss']:.4f}, "
+                f"LR: {scheduler.get_last_lr()[0]:.6f}"
+            )
 
     # Обчислення середніх метрик за епоху
     avg_loss = total_loss / total_batches
@@ -163,12 +164,12 @@ while epoch <= max_epochs:
 
     # Формування метрик епохи
     epoch_metrics = {
-        'loss': avg_loss,
-        'heatmap_loss': avg_heatmap_loss,
-        'size_loss': avg_size_loss,
-        'offset_loss': avg_offset_loss,
-        'learning_rate': scheduler.get_last_lr()[0],
-        'epoch_time': epoch_time
+        "loss": avg_loss,
+        "heatmap_loss": avg_heatmap_loss,
+        "size_loss": avg_size_loss,
+        "offset_loss": avg_offset_loss,
+        "learning_rate": scheduler.get_last_lr()[0],
+        "epoch_time": epoch_time,
     }
 
     # Логування метрик епохи
@@ -177,15 +178,12 @@ while epoch <= max_epochs:
         model=model,
         optimizer=optimizer,
         metrics=epoch_metrics,
-        input_example=input_data[:1]
+        input_example=input_data[:1],
     )
 
     # Збереження кращої моделі
     save_callback.on_eval_epoch_end(
-        model=model,
-        optimizer=optimizer,
-        epoch=epoch,
-        current_metric=avg_loss
+        model=model, optimizer=optimizer, epoch=epoch, current_metric=avg_loss
     )
 
     # Оновлення scheduler
