@@ -1,9 +1,9 @@
 import torch
 import torchvision
 import torchvision.models as models
-from torchvision.models.efficientnet import EfficientNet, FusedMBConv, MBConv
+from torchvision.models.efficientnet import FusedMBConv, MBConv
 
-from .abstract_backbone import AbstractBackbone
+from .abstract_backbone import ConcreteTorchvisionBackbone
 
 
 def layer_props_en(layer):
@@ -23,7 +23,8 @@ def layer_props_en(layer):
         return 0, 0
 
 
-def get_stride_features_and_filters_en(model):
+def get_stride_features_and_filters_en(model: models.EfficientNet):
+    # https://github.com/pytorch/vision/blob/main/torchvision/models/efficientnet.py
     output_number = []
     nchannels = []
     for n, feature in enumerate(model.features):
@@ -38,27 +39,7 @@ def get_stride_features_and_filters_en(model):
     return output_number[1:], nchannels[1:]  # ignore stride 1 data
 
 
-class EfficientNetBackbone(AbstractBackbone):
-    def __init__(self, model: models.EfficientNet):
-        super().__init__()
-        self.model = model
-        layers_no, filters_count = get_stride_features_and_filters_en(model)
-        self.stride_features_no = layers_no
-        self.filters = filters_count
-
-    def forward(self, x):
-        # https://github.com/pytorch/vision/blob/main/torchvision/models/efficientnet.py
-        strided_outputs = []
-        prev_layer = 0
-        for layer_no in self.stride_features_no:
-            for layer in self.model.features[prev_layer:layer_no]:
-                x = layer(x)
-            prev_layer = layer_no
-            strided_outputs.append(x)
-        return strided_outputs
-
-
 def create_efficientnet_backbone(name, weights=None):
     assert name.startswith("efficientnet")
     model = models.get_model(name, weights=weights)
-    return EfficientNetBackbone(model)
+    return ConcreteTorchvisionBackbone(model, get_stride_features_and_filters_en)
