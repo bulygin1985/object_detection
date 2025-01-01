@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import torchvision.models as models
-from torchvision.models.mobilenetv2 import InvertedResidual
+from torchvision.models.mobilenetv2 import InvertedResidual, MobileNetV2 
 
 from .abstract_backbone import AbstractBackbone
 
@@ -44,7 +44,7 @@ def get_stride_features_and_filters(model):
 
 
 class MobileNetV2Backbone(AbstractBackbone):
-    def __init__(self, model: models.ResNet):
+    def __init__(self, model: models.MobileNetV2):
         super().__init__()
         self.model = model
         layers_no, filters_count = get_stride_features_and_filters(model)
