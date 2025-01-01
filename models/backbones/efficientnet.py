@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import torchvision.models as models
-from torchvision.models.efficientnet import FusedMBConv, MBConv
+from torchvision.models.efficientnet import EfficientNet, FusedMBConv, MBConv
 
 from .abstract_backbone import AbstractBackbone
 
@@ -39,7 +39,7 @@ def get_stride_features_and_filters_en(model):
 
 
 class EfficientNetBackbone(AbstractBackbone):
-    def __init__(self, model: models.ResNet):
+    def __init__(self, model: models.EfficientNet):
         super().__init__()
         self.model = model
         layers_no, filters_count = get_stride_features_and_filters_en(model)
