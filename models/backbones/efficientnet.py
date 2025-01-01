@@ -1,8 +1,9 @@
+from typing import List, Tuple
+
 import torch
 import torchvision
 import torchvision.models as models
 from torchvision.models.efficientnet import FusedMBConv, MBConv
-from typing import List, Tuple
 
 from .abstract_backbone import ConcreteTorchvisionBackbone
 

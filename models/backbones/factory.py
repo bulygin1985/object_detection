@@ -1,10 +1,21 @@
+from .abstract_backbone import AbstractBackbone
 from .default_backbone import Backbone
 from .efficientnet import create_efficientnet_backbone
 from .mobilenetv2 import create_mobilenetv2_backbone
 from .resnet import create_resnet_backbone
 
 
-def create_backbone(backbonename: str, alpha: float, weights: str = None):
+def create_backbone(
+    backbonename: str, alpha: float = 1.0, weights: str = None
+) -> AbstractBackbone:
+    """Create backbone.
+    Args:
+        backbonename (str): name of the backbone,
+        alpha (float): model scaling parameter (if backbone supports it, otherwise 1.),
+        weights (str): name of pretrained weights for torchvision preptrained models ('DEFAULT' will work fine).
+    Returns:
+        AbstractBackbone: backbone model
+    """
     if not backbonename or backbonename == "default":
         assert not weights
         return Backbone(alpha)
