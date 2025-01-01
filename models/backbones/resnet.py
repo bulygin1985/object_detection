@@ -1,16 +1,23 @@
+import torch.nn as nn
 import torchvision.models as models
 
 from .abstract_backbone import AbstractBackbone
 
 
-def layer_out_filters(resnet_layer):
+def layer_out_filters(resnet_layer: nn.Sequential) -> int:
+    """Get number of output filters (channels) for resnet layer
+    Args:
+        resnet_layer (nn.Sequential): resnet model layer (one out of 4 layer1..layer4).
+
+    Returns:
+        int: number of output filters for the input layer.
+    """
     lastblock = resnet_layer[-1]
     if isinstance(lastblock, models.resnet.BasicBlock):
         filters = lastblock.conv2.weight.shape[0]
     elif isinstance(lastblock, models.resnet.Bottleneck):
         filters = lastblock.conv3.weight.shape[0]
     if lastblock.downsample is not None:
-        print("downsample")
         filters = filters // 2
     return filters
 
