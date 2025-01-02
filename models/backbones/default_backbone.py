@@ -2,6 +2,7 @@ from collections import OrderedDict
 
 import numpy as np
 import torch.nn as nn
+from torch import Tensor
 
 from .abstract_backbone import AbstractBackbone
 
@@ -49,7 +50,10 @@ class Backbone(AbstractBackbone):
         self.block_num += 1
         return nn.Sequential(block)
 
-    def forward(self, x):
+    def normalize(self, x: Tensor):
+        return x * 2.0 - 1.0
+
+    def forward(self, x: Tensor):
         out = self.layer1(x)
         out_stride_2 = self.layer2(out)
         out = self.layer3(out_stride_2)

@@ -37,7 +37,7 @@ class ModelBuilder(nn.Module):
         )
 
     def forward(self, x, gt=None):
-        x = x / 0.5 - 1.0  # normalization
+        x = self.backbone.normalize(x)
         out = self.backbone(x)
         pred = self.head(*out)
 

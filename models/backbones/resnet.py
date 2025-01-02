@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torchvision.models as models
 
-from .abstract_backbone import AbstractBackbone
+from .abstract_backbone import ImageNetNormalizedBackbone
 
 
 def layer_out_filters(resnet_layer: nn.Sequential) -> int:
@@ -22,7 +22,7 @@ def layer_out_filters(resnet_layer: nn.Sequential) -> int:
     return filters
 
 
-class ResnetBackbone(AbstractBackbone):
+class ResnetBackbone(ImageNetNormalizedBackbone):
     def __init__(self, model: models.ResNet):
         super().__init__()
         self.model = model

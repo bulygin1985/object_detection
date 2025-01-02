@@ -1,6 +1,9 @@
 from abc import abstractmethod
+from typing import Tuple
 
 import torch.nn as nn
+import torchvision.transforms.functional as F
+from torch import Tensor
 
 
 class AbstractBackbone(nn.Module):
@@ -11,14 +14,34 @@ class AbstractBackbone(nn.Module):
     """
 
     @abstractmethod
-    def forward(self, x):
+    def normalize(self, x: Tensor):
+        """Normalize (preprocess) image tensor.
+        Args:
+            x (torch.Tensor): input float image scaled to [0, 1] range.
+        returns image in a form that is ready to be processed by forward method.
+        """
+        pass
+
+    @abstractmethod
+    def forward(self, x: Tensor):
         """run feature extraction on prepared image x.
         returns features at strides 2, 4, 8, 16, 32
         """
         pass
 
 
-class ConcreteTorchvisionBackbone(AbstractBackbone):
+imagenent_mean: Tuple[float, ...] = (0.485, 0.456, 0.406)
+imagenent_std: Tuple[float, ...] = (0.229, 0.224, 0.225)
+
+
+class ImageNetNormalizedBackbone(AbstractBackbone):
+    """Backbone with normalization according to imagenet means and std."""
+
+    def normalize(self, x: Tensor):
+        return F.normalize(x, imagenent_mean, imagenent_std)
+
+
+class ConcreteTorchvisionBackbone(ImageNetNormalizedBackbone):
     """Default backbone implementation for torchvision model.
     Fits for models that contain feature extraction layers in features member(nn.Sequential).
     """
@@ -37,7 +60,7 @@ class ConcreteTorchvisionBackbone(AbstractBackbone):
         self.stride_features_no = layers_no
         self.filters = filters_count
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         strided_outputs = []
         prev_layer = 0
         for layer_no in self.stride_features_no:
