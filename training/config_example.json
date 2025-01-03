@@ -1,0 +1,28 @@
+{
+  "model": {
+    "alpha": 0.25,
+    "weights_path": null,
+    "backbone": {
+      "name": "resnet",
+      "pretrained_weights": "resnet"
+    }
+  },
+  "train": {
+    "is_overfit": true,
+    "lr": 5e-2,
+    "batch_size": 32,
+    "subset_len": 10,
+    "lr_schedule": {
+      "patience": 100,
+      "factor": 0.5,
+      "min_lr": 2e-3
+    },
+    "stop_criteria": {
+      "loss": 1.0,
+      "epoch": null
+    }
+  },
+  "data": {
+    "is_download": false
+  }
+}

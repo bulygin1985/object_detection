@@ -3,9 +3,7 @@ import torch.nn as nn
 from losses.centernet_ttf import CenternetTTFLoss
 from models.backbones import create_backbone
 from models.centernet_head import Head
-
-# todo (AA): move it somewhere
-input_height = input_width = 256
+from utils.config import IMG_HEIGHT, IMG_WIDTH
 
 
 class ModelBuilder(nn.Module):
@@ -32,8 +30,8 @@ class ModelBuilder(nn.Module):
             #   shouldn't we pass input_height and input_width as arguments too?
             class_number,
             4,
-            input_height // 4,
-            input_width // 4,
+            IMG_HEIGHT // 4,
+            IMG_WIDTH // 4,
         )
 
     def forward(self, x, gt=None):
