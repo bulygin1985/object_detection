@@ -5,32 +5,12 @@ from typing import Callable, Optional
 
 import torch
 import torchvision.transforms.v2 as v2
+from data.dataset import Dataset
 from torchvision.datasets import CocoDetection, VisionDataset, VOCDetection
 from torchvision.transforms.v2 import Transform
-
-from data.dataset import Dataset
 from training.encoder import CenternetEncoder
+from utils.config import IMG_HEIGHT, IMG_WIDTH
 from utils.io_utils import download_file, unzip_archive
-
-input_height = input_width = 256
-
-
-def post_load_hook(
-    dataset: VisionDataset,
-    transforms: Optional[Transform] = None,
-    encoder: Optional[Callable] = None,
-    *,
-    target_keys=None,
-) -> Dataset:
-    transforms = transforms or v2.Compose(
-        [
-            v2.Resize(size=(input_width, input_height), antialias=True),
-            v2.ToImage(),
-            v2.ToDtype(torch.float32, scale=True),
-        ]
-    )
-    encoder = encoder or CenternetEncoder(input_height, input_width)
-    return Dataset(dataset, transforms, encoder)
 
 
 def convert_voc_annotations(target):
@@ -71,7 +51,7 @@ def convert_voc_annotations(target):
     }
 
 
-def convert_coco_annotations(target):
+def convert_coco_2_voc(target):
     """Converts COCO annotations to VOC format"""
     if not isinstance(target, list):
         return {
@@ -139,19 +119,24 @@ class DataLoader(ABC):
         if `dataset_path` does not exist
         """
 
+    def _post_load_hook(
+        self,
+        dataset: VisionDataset,
+        transforms: Optional[Transform] = None,
+        encoder: Optional[Callable] = None,
+    ) -> Dataset:
+        transforms = transforms or v2.Compose(
+            [
+                v2.Resize(size=(IMG_WIDTH, IMG_HEIGHT), antialias=True),
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+            ]
+        )
+        encoder = encoder or CenternetEncoder(IMG_HEIGHT, IMG_WIDTH)
+        return Dataset(dataset, transforms, encoder)
+
 
 class PascalVOCDataLoader(DataLoader, VOCDetection):
-    def __init__(self, *, dataset_path: str, image_set: str = None):
-        DataLoader.__init__(self, dataset_path=dataset_path, image_set=image_set)
-        self.is_download = not os.path.exists(self.dataset_path)
-        VOCDetection.__init__(
-            self,
-            root=self.dataset_path,
-            year="2007",
-            image_set=self.image_set,
-            download=self.is_download,
-        )
-
     def __getitem__(self, index):
         img, target = VOCDetection.__getitem__(self, index)
         return img, convert_voc_annotations(target)
@@ -161,7 +146,15 @@ class PascalVOCDataLoader(DataLoader, VOCDetection):
         transforms: Optional[Transform] = None,
         encoder: Optional[Callable] = None,
     ):
-        return post_load_hook(self, transforms, encoder)
+        is_download = not os.path.exists(self.dataset_path)
+        VOCDetection.__init__(
+            self,
+            root=self.dataset_path,
+            year="2007",
+            image_set=self.image_set,
+            download=is_download,
+        )
+        return self._post_load_hook(self, transforms, encoder)
 
 
 class MSCocoDataLoader(DataLoader, CocoDetection):
@@ -183,18 +176,26 @@ class MSCocoDataLoader(DataLoader, CocoDetection):
         },
     }
 
-    def __init__(self, *, dataset_path: str, image_set: str = None):
-        DataLoader.__init__(self, dataset_path=dataset_path, image_set=image_set)
-        self.ann_folder = Path(self.dataset_path) / "annotations"
-        self.images_folder = Path(self.dataset_path) / f"{self.image_set}2017"
+    def __getitem__(self, index):
+        img, target = CocoDetection.__getitem__(self, index)
+        return img, convert_coco_2_voc(target)
+
+    def load(
+        self,
+        transforms: Optional[Transform] = None,
+        encoder: Optional[Callable] = None,
+    ):
+        dataset_config = self.DATASET_URLS[self.image_set]
+        ann_folder = Path(self.dataset_path) / "annotations"
+        images_folder = Path(self.dataset_path) / f"{self.image_set}2017"
 
         if not os.path.exists(self.dataset_path):
-            os.makedirs(self.ann_folder, exist_ok=True)
-            os.makedirs(self.images_folder, exist_ok=True)
+            ann_folder.mkdir(parents=True)
+            images_folder.mkdir(parents=True)
 
             file_urls = [
-                self.DATASET_URLS[self.image_set]["annotations"],
-                self.DATASET_URLS[self.image_set]["images"],
+                dataset_config["annotations"],
+                dataset_config["images"],
             ]
             for url in file_urls:
                 filepath = Path(self.dataset_path) / url.split("/")[-1]
@@ -205,19 +206,7 @@ class MSCocoDataLoader(DataLoader, CocoDetection):
 
         CocoDetection.__init__(
             self,
-            root=str(self.images_folder),
-            annFile=str(
-                self.ann_folder / self.DATASET_URLS[self.image_set]["ann_file"]
-            ),
+            root=images_folder,
+            annFile=ann_folder / dataset_config["ann_file"],
         )
-
-    def __getitem__(self, index):
-        img, target = CocoDetection.__getitem__(self, index)
-        return img, convert_coco_annotations(target)
-
-    def load(
-        self,
-        transforms: Optional[Transform] = None,
-        encoder: Optional[Callable] = None,
-    ):
-        return post_load_hook(self, transforms, encoder)
+        return self._post_load_hook(self, transforms, encoder)
