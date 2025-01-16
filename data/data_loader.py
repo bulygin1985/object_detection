@@ -5,9 +5,10 @@ from typing import Callable, Optional
 
 import torch
 import torchvision.transforms.v2 as v2
-from data.dataset import Dataset
 from torchvision.datasets import CocoDetection, VisionDataset, VOCDetection
 from torchvision.transforms.v2 import Transform
+
+from data.dataset import Dataset
 from training.encoder import CenternetEncoder
 from utils.config import IMG_HEIGHT, IMG_WIDTH
 from utils.io_utils import download_file, unzip_archive
