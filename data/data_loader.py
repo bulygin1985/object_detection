@@ -206,7 +206,9 @@ class MSCocoDataLoader(DataLoader, CocoDetection):
         CocoDetection.__init__(
             self,
             root=str(self.images_folder),
-            annFile=str(self.ann_folder / self.DATASET_URLS[self.image_set]["ann_file"]),
+            annFile=str(
+                self.ann_folder / self.DATASET_URLS[self.image_set]["ann_file"]
+            ),
         )
 
     def __getitem__(self, index):
