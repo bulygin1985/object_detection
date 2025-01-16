@@ -3,4 +3,5 @@ COCO/
 __pycache__/
 .idea/
 models/checkpoints/*.pt
-
+PASCAL_VOC/
+callbacks/
