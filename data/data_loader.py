@@ -52,7 +52,7 @@ def convert_voc_annotations(target):
     }
 
 
-def convert_coco_annotations(target):
+def convert_coco_2_voc(target):
     """Converts COCO annotations to VOC format"""
     if not isinstance(target, list):
         return {
