@@ -10,27 +10,8 @@ from torchvision.transforms.v2 import Transform
 
 from data.dataset import Dataset
 from training.encoder import CenternetEncoder
+from utils.config import IMG_HEIGHT, IMG_WIDTH
 from utils.io_utils import download_file, unzip_archive
-
-input_height = input_width = 256
-
-
-def post_load_hook(
-    dataset: VisionDataset,
-    transforms: Optional[Transform] = None,
-    encoder: Optional[Callable] = None,
-    *,
-    target_keys=None,
-) -> Dataset:
-    transforms = transforms or v2.Compose(
-        [
-            v2.Resize(size=(input_width, input_height), antialias=True),
-            v2.ToImage(),
-            v2.ToDtype(torch.float32, scale=True),
-        ]
-    )
-    encoder = encoder or CenternetEncoder(input_height, input_width)
-    return Dataset(dataset, transforms, encoder)
 
 
 def convert_voc_annotations(target):
@@ -138,6 +119,22 @@ class DataLoader(ABC):
         The dataset is automatically downloaded
         if `dataset_path` does not exist
         """
+
+    def _post_load_hook(
+        self,
+        dataset: VisionDataset,
+        transforms: Optional[Transform] = None,
+        encoder: Optional[Callable] = None,
+    ) -> Dataset:
+        transforms = transforms or v2.Compose(
+            [
+                v2.Resize(size=(IMG_WIDTH, IMG_HEIGHT), antialias=True),
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+            ]
+        )
+        encoder = encoder or CenternetEncoder(IMG_HEIGHT, IMG_WIDTH)
+        return Dataset(dataset, transforms, encoder)
 
 
 class PascalVOCDataLoader(DataLoader, VOCDetection):
