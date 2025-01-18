@@ -5,13 +5,20 @@
     "backbone": {
       "name": "efficientnet_b0",
       "pretrained_weights": "DEFAULT"
+    },
+    "head": {
+      "filters_size": [
+        128,
+        64,
+        32
+      ]
     }
   },
   "train": {
     "is_overfit": false,
     "lr": 5e-2,
-    "batch_size": 48,
-    "subset_len": 150,
+    "batch_size": 32,
+    "subset_len": 128,
     "val_subset_len": 96,
     "calculate_epoch_loss": true,
     "lr_schedule": {
