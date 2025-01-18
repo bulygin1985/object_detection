@@ -40,7 +40,8 @@ def create_backbone(
     if backbone_name_parsed == "default":
         return backbone_class(alpha)
 
-    print(f"WARNING! Only alpha=1 is supported for {backbone_name}")
+    if alpha!=1.:
+        print(f"WARNING! Only alpha=1 is supported for {backbone_name}")
 
     model = models.get_model(backbone_name_parsed, weights=weights)
     return backbone_class(model)
