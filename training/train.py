@@ -56,7 +56,7 @@ def calculate_loss(model, data, batch_size=32):
     batch_generator = torch.utils.data.DataLoader(
         data, num_workers=0, batch_size=batch_size, shuffle=False
     )
-    loss = 0.
+    loss = 0.0
     count = 0
     with torch.no_grad() as ng:
         for i, data in enumerate(batch_generator):
@@ -71,7 +71,7 @@ def calculate_loss(model, data, batch_size=32):
             curr_count = input_data.shape[0]
             loss += curr_loss * curr_count
             count += curr_count
-    return loss/count
+    return loss / count
 
 
 def train(model_conf, train_conf, data_conf):
@@ -92,7 +92,6 @@ def train(model_conf, train_conf, data_conf):
         image_set=image_set_train,
         download=data_conf["is_download"],
     )
-
 
     transform = transforms.Compose(
         [
@@ -126,9 +125,7 @@ def train(model_conf, train_conf, data_conf):
             torch_dataset_train, range(train_subset_len)
         )
     if val_subset_len is not None:
-        val_data = torch.utils.data.Subset(
-            torch_dataset_val, range(val_subset_len)
-        )
+        val_data = torch.utils.data.Subset(torch_dataset_val, range(val_subset_len))
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
 
@@ -186,7 +183,9 @@ def train(model_conf, train_conf, data_conf):
             train_loss.append(calculate_loss(model, training_data, batch_size))
             val_loss.append(calculate_loss(model, val_data, batch_size))
             print(f"= = = = = = = = = =")
-            print(f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}")
+            print(
+                f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}"
+            )
             print(f"= = = = = = = = = =")
 
         if criteria_satisfied(loss, epoch):
@@ -202,7 +201,7 @@ def train(model_conf, train_conf, data_conf):
         backbone=model_conf["backbone"]["name"],
     )
 
-    loss_df = pd.DataFrame( {"train_loss": train_loss, "val_loss": val_loss})
+    loss_df = pd.DataFrame({"train_loss": train_loss, "val_loss": val_loss})
     loss_df.to_csv("losses.csv")
 
 
