@@ -80,16 +80,16 @@ def train(model_conf, train_conf, data_conf):
     print(f"Selected validation image_set: {image_set_val}")
 
     dataset_val = torchvision.datasets.VOCDetection(
-        root=f"../VOC{image_set_val}",
+        root=f"../VOC",
         year="2007",
-        image_set=image_set_train,
+        image_set=image_set_val,
         download=data_conf["is_download"],
     )
     dataset_train = torchvision.datasets.VOCDetection(
-        root=f"../VOC{image_set_train}",
+        root=f"../VOC",
         year="2007",
         image_set=image_set_train,
-        download=data_conf["is_download"],
+        download=False,
     )
 
     transform = transforms.Compose(
