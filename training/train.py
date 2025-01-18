@@ -104,11 +104,9 @@ def train(model_conf, train_conf, data_conf):
 
     dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
     dataset_train = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_train)
-    torch_dataset_val = Dataset(
-        dataset=dataset_val, transformation=transform, encoder=encoder
-    )
-    torch_dataset_train = Dataset(
-        dataset=dataset_val, transformation=transform, encoder=encoder
+    val_data = Dataset(dataset=dataset_val, transformation=transform, encoder=encoder)
+    training_data = Dataset(
+        dataset=dataset_train, transformation=transform, encoder=encoder
     )
     tag = "train"
     batch_size = train_conf["batch_size"]
@@ -120,11 +118,9 @@ def train(model_conf, train_conf, data_conf):
         assert train_subset_len is not None
         batch_size = train_subset_len
     if train_subset_len is not None:
-        training_data = torch.utils.data.Subset(
-            torch_dataset_train, range(train_subset_len)
-        )
+        training_data = torch.utils.data.Subset(training_data, range(train_subset_len))
     if val_subset_len is not None:
-        val_data = torch.utils.data.Subset(torch_dataset_val, range(val_subset_len))
+        val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
 
