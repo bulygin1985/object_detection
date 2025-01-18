@@ -112,8 +112,8 @@ def train(model_conf, train_conf, data_conf):
     )
     tag = "train"
     batch_size = train_conf["batch_size"]
-    train_subset_len = train_conf["subset_len"]
-    val_subset_len = train_conf["val_subset_len"]
+    train_subset_len = train_conf.get("subset_len")
+    val_subset_len = train_conf.get("val_subset_len")
 
     if train_conf["is_overfit"]:
         tag = "overfit"
