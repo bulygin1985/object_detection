@@ -1,0 +1,30 @@
+{
+  "model": {
+    "alpha": 1.0,
+    "weights_path": null,
+    "backbone": {
+      "name": "efficientnet_b0",
+      "pretrained_weights": "DEFAULT"
+    }
+  },
+  "train": {
+    "is_overfit": false,
+    "lr": 5e-2,
+    "batch_size": 48,
+    "subset_len": 150,
+    "val_subset_len": 96,
+    "calculate_epoch_loss": true,
+    "lr_schedule": {
+      "patience": 10,
+      "factor": 0.2,
+      "min_lr": 1e-5
+    },
+    "stop_criteria": {
+      "loss": 1,
+      "epoch": 50
+    }
+  },
+  "data": {
+    "is_download": false
+  }
+}
