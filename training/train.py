@@ -18,7 +18,7 @@ def criteria_builder(stop_loss, stop_epoch):
     def criteria_satisfied(current_loss, current_epoch):
         if stop_loss is not None and current_loss < stop_loss:
             return True
-        if stop_epoch is not None and current_epoch > stop_epoch:
+        if stop_epoch is not None and current_epoch >= stop_epoch:
             return True
         return False
 
@@ -51,9 +51,9 @@ def main(config_path: str = None):
     train(model_conf, train_conf, data_conf)
 
 
-def calculate_loss(model, data, batch_size=32):
+def calculate_loss(model, data, batch_size=32, num_workers=0):
     batch_generator = torch.utils.data.DataLoader(
-        data, num_workers=0, batch_size=batch_size, shuffle=False
+        data, num_workers=num_workers, batch_size=batch_size, shuffle=False
     )
     loss = 0.0
     count = 0
@@ -112,6 +112,7 @@ def train(model_conf, train_conf, data_conf):
     batch_size = train_conf["batch_size"]
     train_subset_len = train_conf.get("subset_len")
     val_subset_len = train_conf.get("val_subset_len")
+    num_workers = train_conf.get("num_workers", 0)
 
     if train_conf["is_overfit"]:
         tag = "overfit"
@@ -147,7 +148,7 @@ def train(model_conf, train_conf, data_conf):
     model.train(True)
 
     batch_generator_train = torch.utils.data.DataLoader(
-        train_data, num_workers=0, batch_size=batch_size, shuffle=False
+        train_data, num_workers=num_workers, batch_size=batch_size, shuffle=False
     )
 
     epoch = 1
@@ -176,8 +177,10 @@ def train(model_conf, train_conf, data_conf):
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
         if calculate_epoch_loss:
-            train_loss.append(calculate_loss(model, train_data, batch_size))
-            val_loss.append(calculate_loss(model, val_data, batch_size))
+            train_loss.append(
+                calculate_loss(model, train_data, batch_size, num_workers)
+            )
+            val_loss.append(calculate_loss(model, val_data, batch_size, num_workers))
             print(f"= = = = = = = = = =")
             print(
                 f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}"
@@ -187,7 +190,9 @@ def train(model_conf, train_conf, data_conf):
         if criteria_satisfied(loss, epoch):
             break
 
-        scheduler.step(loss_dict["loss"])
+        check_loss_value = train_loss[-1] if calculate_epoch_loss else loss
+
+        scheduler.step(check_loss_value)
         epoch += 1
 
     save_model(
