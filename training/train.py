@@ -51,6 +51,22 @@ def main(config_path: str = None):
     train(model_conf, train_conf, data_conf)
 
 
+def compose_transforms(data_augmentation_params=None):
+    transforms_list = [transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT))]
+    if data_augmentation_params:
+        if data_augmentation_params.get("random_flip_horizontal"):
+            print("Applying random_flip_horizontal")
+            transforms_list.append(transforms.RandomHorizontalFlip())
+        brightness_jitter = data_augmentation_params.get("color_jitter_brightness")
+        if brightness_jitter:
+            print("Applying color_jitter_brightness")
+            transforms_list.append(transforms.ColorJitter(brightness=brightness_jitter))
+    return transforms.Compose(
+        transforms_list
+        + [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)]
+    )
+
+
 def calculate_loss(model, data, batch_size=32, num_workers=0):
     batch_generator = torch.utils.data.DataLoader(
         data, num_workers=num_workers, batch_size=batch_size, shuffle=False
@@ -92,21 +108,18 @@ def train(model_conf, train_conf, data_conf):
         download=False,
     )
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT)),
-            transforms.ToImage(),
-            transforms.ToDtype(torch.float32, scale=True),
-        ]
-    )
+    train_transform = compose_transforms(train_conf.get("data_augmentation"))
+    val_transform = compose_transforms()
 
     encoder = CenternetEncoder(IMG_HEIGHT, IMG_WIDTH)
 
     dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
     dataset_train = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_train)
-    val_data = Dataset(dataset=dataset_val, transformation=transform, encoder=encoder)
+    val_data = Dataset(
+        dataset=dataset_val, transformation=val_transform, encoder=encoder
+    )
     train_data = Dataset(
-        dataset=dataset_train, transformation=transform, encoder=encoder
+        dataset=dataset_train, transformation=train_transform, encoder=encoder
     )
     tag = "train"
     batch_size = train_conf["batch_size"]
@@ -186,6 +199,14 @@ def train(model_conf, train_conf, data_conf):
                 f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}"
             )
             print(f"= = = = = = = = = =")
+            loss_df = pd.DataFrame(
+                {
+                    "epoch": range(1, epoch + 1),
+                    "train_loss": train_loss,
+                    "val_loss": val_loss,
+                }
+            )
+            loss_df.to_csv("losses.csv", index=False)
 
         if criteria_satisfied(loss, epoch):
             break
@@ -201,9 +222,6 @@ def train(model_conf, train_conf, data_conf):
         tag=tag,
         backbone=model_conf["backbone"]["name"],
     )
-
-    loss_df = pd.DataFrame({"train_loss": train_loss, "val_loss": val_loss})
-    loss_df.to_csv("losses.csv")
 
 
 if __name__ == "__main__":
