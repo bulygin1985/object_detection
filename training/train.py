@@ -105,7 +105,7 @@ def train(model_conf, train_conf, data_conf):
     dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
     dataset_train = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_train)
     val_data = Dataset(dataset=dataset_val, transformation=transform, encoder=encoder)
-    training_data = Dataset(
+    train_data = Dataset(
         dataset=dataset_train, transformation=transform, encoder=encoder
     )
     tag = "train"
@@ -118,7 +118,7 @@ def train(model_conf, train_conf, data_conf):
         assert train_subset_len is not None
         batch_size = train_subset_len
     if train_subset_len is not None:
-        training_data = torch.utils.data.Subset(training_data, range(train_subset_len))
+        train_data = torch.utils.data.Subset(train_data, range(train_subset_len))
     if val_subset_len is not None:
         val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
@@ -147,7 +147,7 @@ def train(model_conf, train_conf, data_conf):
     model.train(True)
 
     batch_generator_train = torch.utils.data.DataLoader(
-        training_data, num_workers=0, batch_size=batch_size, shuffle=False
+        train_data, num_workers=0, batch_size=batch_size, shuffle=False
     )
 
     epoch = 1
@@ -176,7 +176,7 @@ def train(model_conf, train_conf, data_conf):
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
         if calculate_epoch_loss:
-            train_loss.append(calculate_loss(model, training_data, batch_size))
+            train_loss.append(calculate_loss(model, train_data, batch_size))
             val_loss.append(calculate_loss(model, val_data, batch_size))
             print(f"= = = = = = = = = =")
             print(
