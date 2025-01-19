@@ -9,11 +9,11 @@ Reference 2: https://github.com/yukkyo/voc2coco/blob/master/voc2coco.py
 5. this script doesn't convert segmentation
 
 Example to run:
-python voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
+python dataset_voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
 
 or using the default values:
 
-python voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations
+python dataset_voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations
 """
 
 import argparse
@@ -33,7 +33,7 @@ SPLIT = "split"
 
 
 def dump_voc_classes(
-    voc_annotation_path: str, voc_class_names_output_path: str = None
+    voc_annotation_path: str, voc_class_names_output_path: str = None,
 ) -> [str]:
     """
     Reads annotations for a dataset in VOC format.
@@ -154,6 +154,7 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
     o_height = ymax - ymin
     area = o_width * o_height
     if area <= min_area:
+        # todo (AA): log the fact that area < min_area
         return {}
     ann = {
         "area": o_width * o_height,
@@ -210,6 +211,7 @@ def convert_xmls_to_cocojson(
         if valid_image:
             output_json_dict["images"].append(img_info)
         else:
+            # todo (AA): log this message
             print(
                 f"Image {img_id} is removed since it does not contain any valid object"
             )
