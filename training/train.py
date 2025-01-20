@@ -168,8 +168,10 @@ def train(model_conf, train_conf, data_conf):
 
     train_loss = []
     val_loss = []
+    lrs = []
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
+    save_best_model = train_conf.get("save_best_model", True)
 
     while True:
         loss_dict = {}
@@ -189,6 +191,8 @@ def train(model_conf, train_conf, data_conf):
             curr_lr = scheduler.get_last_lr()[0]
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
+        lrs.append(curr_lr)
+
         if calculate_epoch_loss:
             train_loss.append(
                 calculate_loss(model, train_data, batch_size, num_workers)
@@ -204,9 +208,16 @@ def train(model_conf, train_conf, data_conf):
                     "epoch": range(1, epoch + 1),
                     "train_loss": train_loss,
                     "val_loss": val_loss,
+                    "lr": lrs
                 }
             )
             loss_df.to_csv("losses.csv", index=False)
+            if save_best_model and val_loss[-1]==min(val_loss):
+                save_model(model,
+                           model_conf["weights_path"],
+                           tag=tag+"_best",
+                           backbone=model_conf["backbone"]["name"],
+                          )
 
         if criteria_satisfied(loss, epoch):
             break
