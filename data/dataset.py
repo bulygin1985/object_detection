@@ -1,6 +1,7 @@
+from collections import namedtuple
+
 import torch
 from torch.utils import data
-from collections import namedtuple
 
 Empty_object = namedtuple("Empty_object", [])
 Empty_object.get = lambda *args: Empty_object()

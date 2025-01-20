@@ -5,7 +5,12 @@ import torch
 import torch.nn as nn
 
 
-def load_model(device: torch.device, model_type: Type[nn.Module], checkpoint_path: str = None, alpha: float = 0.25):
+def load_model(
+    device: torch.device,
+    model_type: Type[nn.Module],
+    checkpoint_path: str = None,
+    alpha: float = 0.25,
+):
     checkpoint_path = (
         "../models/checkpoints/pretrained_weights.pt"
         if checkpoint_path is None

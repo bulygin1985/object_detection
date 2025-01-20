@@ -3,20 +3,23 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
+
 import os
 from collections import namedtuple
 
 import torch
 import torchvision
-from models.centernet import ModelBuilder
-from predictions import get_predictions
 from load_model import load_model
+from predictions import get_predictions
 from torch.utils.data import Subset
-from data.dataset import Dataset
 from torchvision.transforms import v2 as transforms
 
+from data.dataset import Dataset
+from models.centernet import ModelBuilder
+
 input_height = input_width = 256
-Img_info = namedtuple('Img_info', ['id', 'file_name', 'height', 'width'])
+Img_info = namedtuple("Img_info", ["id", "file_name", "height", "width"])
+
 
 # todo (AA): Move it to a separate file
 def prepare_dataset():
@@ -33,15 +36,17 @@ def prepare_dataset():
 
     imgs_info = []
     for i in indices:
-        ann = dataset[i][1]['annotation']
-        filename = ann['filename']
+        ann = dataset[i][1]["annotation"]
+        filename = ann["filename"]
         id_str, _ = os.path.splitext(filename)
-        imgs_info.append(Img_info(
-            id=int(id_str),
-            file_name=filename,
-            height=ann['size']['height'],
-            width=ann['size']['width']
-        ))
+        imgs_info.append(
+            Img_info(
+                id=int(id_str),
+                file_name=filename,
+                height=ann["size"]["height"],
+                width=ann["size"]["width"],
+            )
+        )
     # the same can be achieved much easier if dataset is a CocoDetection dataset:
     # img_info = dataset.coco.dataset['images']
 
@@ -78,6 +83,7 @@ def convert_predictions_to_coco_format(img_filenames, preds):
                         }
                     )
     return results
+
 
 def transform_dataset(dataset):
     """Transform the dataset for visualization"""

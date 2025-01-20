@@ -51,7 +51,9 @@ def main(config_path: str = None):
 def train(model_conf, train_conf, data_conf):
     print(f"Selected image_set: {data_conf["image_set"]}")
 
-    dataset = CocoDetection(root=data_conf["images_folder"], annFile=data_conf["ann_file"])
+    dataset = CocoDetection(
+        root=data_conf["images_folder"], annFile=data_conf["ann_file"]
+    )
     wrapped_dataset = wrap_dataset_for_transforms_v2(dataset)
 
     transform = transforms.Compose(
