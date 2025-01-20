@@ -68,11 +68,12 @@ def convert_predictions_to_coco_format(img_filenames, preds):
             for i in range(pred_shape[1]):
                 for j in range(pred_shape[2]):
                     img_id, _ = os.path.splitext(filename)
+                    box = squeezed_pred[num_categories:, i, j].tolist()
                     results.append(
                         {
                             "image_id": int(img_id),
                             "category_id": category,
-                            "bbox": squeezed_pred[num_categories:, i, j].tolist(),
+                            "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],
                             "score": squeezed_pred[category, i, j],
                         }
                     )
