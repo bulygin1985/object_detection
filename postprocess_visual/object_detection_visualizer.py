@@ -87,7 +87,7 @@ class ObjectDetectionVisualizer:
         pred_scores,
         sample_index,
     ):
-        fig = plt.figure(figsize=(20, 5))
+        _ = plt.figure(figsize=(20, 5))
 
         plt.subplot(1, 4, 1)
         plt.title(f"Original Image {sample_index + 1}")
@@ -115,7 +115,7 @@ class ObjectDetectionVisualizer:
             plt.text(0.5, 0.5, "No detections", ha="center", va="center")
 
     def visualize_predictions(self, preds):
-        for i, orig_img in enumerate(self.dataset):
+        for i, (orig_img, _) in enumerate(self.dataset):
             pred = preds[i]
 
             heatmaps = pred[:, :20]
