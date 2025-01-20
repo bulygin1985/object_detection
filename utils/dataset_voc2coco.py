@@ -33,7 +33,7 @@ SPLIT = "split"
 
 
 def dump_voc_classes(
-    voc_annotation_path: str, voc_class_names_output_path: str = None,
+    voc_annotation_path: str, voc_class_names_output_path: str = None
 ) -> [str]:
     """
     Reads annotations for a dataset in VOC format.
