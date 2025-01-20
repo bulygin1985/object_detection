@@ -3,7 +3,7 @@ from torch.utils import data
 
 
 class Dataset(data.Dataset):
-    def __init__(self, dataset, transformation, encoder):
+    def __init__(self, dataset, transformation, encoder=None):
         self._dataset = dataset
         self._transformation = transformation
         self._encoder = encoder
@@ -13,6 +13,10 @@ class Dataset(data.Dataset):
         img_, bboxes_, labels_ = self._transformation(
             img, lbl.get("boxes", []), lbl.get("labels", [])
         )
+
+        if self._encoder is None:
+            return img_, None
+
         lbl_encoded = self._encoder(bboxes_, labels_)
         return img_, torch.from_numpy(lbl_encoded)
 
