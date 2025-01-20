@@ -1,0 +1,103 @@
+"""
+Convert VOC format predictions to COCO.
+Example to run:
+python predictions_voc2coco.py
+"""
+import os
+from collections import namedtuple
+
+import torch
+import torchvision
+from models.centernet import ModelBuilder
+from predictions import get_predictions
+from load_model import load_model
+from torch.utils.data import Subset
+from data.dataset import Dataset
+from torchvision.transforms import v2 as transforms
+
+input_height = input_width = 256
+Img_info = namedtuple('Img_info', ['id', 'file_name', 'height', 'width'])
+
+# todo (AA): Move it to a separate file
+def prepare_dataset():
+    # Load VOC dataset
+    dataset = torchvision.datasets.VOCDetection(
+        root="../VOC", year="2007", image_set="trainval", download=False
+    )
+
+    dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset)
+
+    # Define a dataset that is a subset of the initial dataset
+    indices = range(10)
+    dataset_val = Subset(dataset_val, indices)
+
+    imgs_info = []
+    for i in indices:
+        ann = dataset[i][1]['annotation']
+        filename = ann['filename']
+        id_str, _ = os.path.splitext(filename)
+        imgs_info.append(Img_info(
+            id=int(id_str),
+            file_name=filename,
+            height=ann['size']['height'],
+            width=ann['size']['width']
+        ))
+    # the same can be achieved much easier if dataset is a CocoDetection dataset:
+    # img_info = dataset.coco.dataset['images']
+
+    return {"images_info": imgs_info, "annotations": dataset_val}
+
+
+def convert_predictions_to_coco_format(img_filenames, preds):
+    # [{
+    #     "image_id": int,
+    #     "category_id": int,
+    #     "bbox": [x, y, width, height],
+    #     "score": float,
+    # }]
+
+    results = []
+
+    pred_shape = preds[0].squeeze().shape
+
+    num_categories = pred_shape[0] - 4
+    for filename, pred in zip(img_filenames, preds):
+        squeezed_pred = pred.squeeze()
+        print(filename)
+        for category in range(num_categories):
+            for i in range(pred_shape[1]):
+                for j in range(pred_shape[2]):
+                    img_id, _ = os.path.splitext(filename)
+                    results.append(
+                        {
+                            "image_id": int(img_id),
+                            "category_id": category,
+                            "bbox": squeezed_pred[num_categories:, i, j].tolist(),
+                            "score": squeezed_pred[category, i, j],
+                        }
+                    )
+    return results
+
+def transform_dataset(dataset):
+    """Transform the dataset for visualization"""
+    transform = transforms.Compose(
+        [
+            transforms.Resize(size=(input_width, input_height)),
+        ]
+    )
+
+    return Dataset(dataset=dataset, transformation=transform)
+
+
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = load_model(device, ModelBuilder)
+
+    dataset = prepare_dataset()
+    dataset_transformed = transform_dataset(dataset["annotations"])
+    predictions = get_predictions(device, model, dataset_transformed)
+
+    img_filenames = [elem.file_name for elem in dataset["images_info"]]
+
+    _ = convert_predictions_to_coco_format(img_filenames, predictions)

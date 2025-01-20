@@ -1,4 +1,5 @@
 VOC/
+VOC_COCO/
 COCO/
 __pycache__/
 .idea/

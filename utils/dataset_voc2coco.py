@@ -167,13 +167,13 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
     return ann
 
 
-def convert_xmls_to_cocojson(
+def convert_xmls_to_coco(
     voc_ann_dir: str,
     annotation_files: List[str],
     label2id: Dict[str, int],
     output_jsonpath: str,
     min_area: int,
-):
+) -> Dict[str, object]:
     output_json_dict = {
         "images": [],
         "type": "instances",
@@ -220,10 +220,13 @@ def convert_xmls_to_cocojson(
         category_info = {"supercategory": "none", "id": label_id, "name": label}
         output_json_dict["categories"].append(category_info)
 
-    with open(output_jsonpath, "w") as f:
-        output_json = json.dumps(output_json_dict)
-        f.write(output_json)
-        print(f"The COCO format annotation is saved to {output_jsonpath}")
+    if output_jsonpath:
+        with open(output_jsonpath, "w") as f:
+            output_json = json.dumps(output_json_dict)
+            f.write(output_json)
+            print(f"The COCO format annotation is saved to {output_jsonpath}")
+
+    return output_json_dict
 
 
 def main():
@@ -287,7 +290,7 @@ def main():
         output_path_fmt = os.path.join(coco_ann_dir, "%s_cocoformat.json")
         ann_files = get_ann_files(ann_ids_dir=voc_ann_ids_dir)
         for mode, ann_file in ann_files.items():
-            convert_xmls_to_cocojson(
+            convert_xmls_to_coco(
                 voc_ann_dir=voc_ann_dir,
                 annotation_files=ann_file,
                 label2id=label2id,
@@ -302,7 +305,7 @@ def main():
             if os.path.isfile(os.path.join(voc_ann_dir, ann_filename))
             and os.path.splitext(ann_filename)[1] == ".xml"
         ]
-        convert_xmls_to_cocojson(
+        convert_xmls_to_coco(
             voc_ann_dir=voc_ann_dir,
             annotation_files=ann_files,
             label2id=label2id,
