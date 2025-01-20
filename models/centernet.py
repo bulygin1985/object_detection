@@ -13,7 +13,7 @@ class ModelBuilder(nn.Module):
 
     def __init__(
         self,
-        filters_size: list,
+        filters_size: list=None,
         alpha=1.0,
         class_number=20,
         backbone: str = "default",
@@ -22,6 +22,8 @@ class ModelBuilder(nn.Module):
         super().__init__()
         self.class_number = class_number
         self.backbone = create_backbone(backbone, alpha, backbone_weights)
+        if not filters_size:
+            filters_size = [128, 64, 32]
         self.head = Head(
             backbone_output_filters=self.backbone.filters,
             filters_size=filters_size,
