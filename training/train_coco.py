@@ -54,7 +54,6 @@ def train(model_conf, train_conf, data_conf):
     dataset_loader = MSCOCODatasetLoader(
         data_conf["images_folder"], data_conf["ann_file"]
     )
-
     transform = transforms.Compose(
         [
             transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT)),
