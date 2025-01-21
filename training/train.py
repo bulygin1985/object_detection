@@ -1,4 +1,5 @@
 import argparse
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -54,12 +55,29 @@ def main(config_path: str = None):
 def compose_transforms(data_augmentation_params=None):
     transforms_list = [transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT))]
     if data_augmentation_params:
+        resize_crop_scale = data_augmentation_params.get(
+            "random_resize_crop_scale", None
+        )
+        resize_crop_ratio = data_augmentation_params.get(
+            "random_resize_crop_ratio", None
+        )
+        if resize_crop_scale is not None:
+            print(
+                f"Applying RandomResizedCrop scale={resize_crop_scale} ratio={resize_crop_ratio}"
+            )
+            transforms_list = [
+                transforms.RandomResizedCrop(
+                    size=(IMG_WIDTH, IMG_HEIGHT),
+                    scale=resize_crop_scale,
+                    ratio=resize_crop_ratio,
+                )
+            ]
         if data_augmentation_params.get("random_flip_horizontal"):
             print("Applying random_flip_horizontal")
             transforms_list.append(transforms.RandomHorizontalFlip())
         brightness_jitter = data_augmentation_params.get("color_jitter_brightness")
         if brightness_jitter:
-            print("Applying color_jitter_brightness")
+            print(f"Applying color_jitter_brightness={brightness_jitter}")
             transforms_list.append(transforms.ColorJitter(brightness=brightness_jitter))
     return transforms.Compose(
         transforms_list
@@ -174,6 +192,7 @@ def train(model_conf, train_conf, data_conf):
     save_best_model = train_conf.get("save_best_model", True)
 
     while True:
+        epoch_start = time.perf_counter()
         loss_dict = {}
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
@@ -202,22 +221,22 @@ def train(model_conf, train_conf, data_conf):
             print(
                 f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}"
             )
-            print(f"= = = = = = = = = =")
             loss_df = pd.DataFrame(
                 {
                     "epoch": range(1, epoch + 1),
                     "train_loss": train_loss,
                     "val_loss": val_loss,
-                    "lr": lrs
+                    "lr": lrs,
                 }
             )
             loss_df.to_csv("losses.csv", index=False)
-            if save_best_model and val_loss[-1]==min(val_loss):
-                save_model(model,
-                           model_conf["weights_path"],
-                           tag=tag+"_best",
-                           backbone=model_conf["backbone"]["name"],
-                          )
+            if save_best_model and val_loss[-1] == min(val_loss):
+                save_model(
+                    model,
+                    model_conf["weights_path"],
+                    tag=tag + "_best",
+                    backbone=model_conf["backbone"]["name"],
+                )
 
         if criteria_satisfied(loss, epoch):
             break
@@ -225,7 +244,17 @@ def train(model_conf, train_conf, data_conf):
         check_loss_value = train_loss[-1] if calculate_epoch_loss else loss
 
         scheduler.step(check_loss_value)
+        print(
+            f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
+        )
+        print(f"= = = = = = = = = =")
         epoch += 1
+
+    if calculate_epoch_loss:
+        tl = torch.Tensor(val_loss)
+        best_idx = torch.argmin(tl).item()
+        best_val = tl[best_idx].item()
+        print(f"Best validation loss = {best_val} was reached at {best_idx+1} epoch.")
 
     save_model(
         model,
