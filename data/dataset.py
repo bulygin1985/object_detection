@@ -16,7 +16,7 @@ class Dataset(data.Dataset):
     def __getitem__(self, index):
         img, lbl = self._dataset[index]
         img_, bboxes_, labels_ = self._transformation(
-            img, lbl.get("boxes", Empty_object()), lbl.get("labels", Empty_object())
+            img, lbl.get("boxes", []), lbl.get("labels", [])
         )
 
         if self._encoder is None:
