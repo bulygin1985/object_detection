@@ -3,9 +3,9 @@ from pathlib import Path
 
 import torch
 import torchvision.transforms.v2 as transforms
-from torchvision.datasets import CocoDetection, wrap_dataset_for_transforms_v2
 
 from data.dataset import Dataset
+from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
 from training.encoder import CenternetEncoder
 from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
@@ -51,10 +51,9 @@ def main(config_path: str = None):
 def train(model_conf, train_conf, data_conf):
     print(f"Selected image_set: {data_conf["image_set"]}")
 
-    dataset = CocoDetection(
-        root=data_conf["images_folder"], annFile=data_conf["ann_file"]
+    dataset_loader = MSCOCODatasetLoader(
+        data_conf["images_folder"], data_conf["ann_file"]
     )
-    wrapped_dataset = wrap_dataset_for_transforms_v2(dataset)
 
     transform = transforms.Compose(
         [
@@ -68,7 +67,7 @@ def train(model_conf, train_conf, data_conf):
     )
 
     torch_dataset = Dataset(
-        dataset=wrapped_dataset,
+        dataset=dataset_loader.get_dataset(),
         transformation=transform,
         encoder=encoder,
     )
