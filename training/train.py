@@ -163,10 +163,26 @@ def train(model_conf, train_conf, data_conf):
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
-    parameters = list(model.parameters())
-    optimizer = torch.optim.Adam(parameters, lr=train_conf["lr"])
+    lr = train_conf["lr"]
+    lr_backbone = train_conf.get("lr_backbone", lr)
+    lr_head = train_conf.get("lr_head", lr)
+    if lr_backbone == lr_head:
+        optimizer_main = torch.optim.Adam(model.parameters(), lr=lr)
+    else:
+        optimizer_main = torch.optim.Adam(
+            [
+                {"params": model.backbone.parameters(), "lr": lr_backbone},
+                {"params": model.head.parameters(), "lr": lr_head},
+            ],
+            lr=lr,
+        )
+
+    pretrain_epochs = train_conf.get("freeze_backbone_epochs")
+    if pretrain_epochs:
+        optimizer_pretrain = torch.optim.Adam(model.head.parameters(), lr=lr_head)
+
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
+        optimizer_main,
         mode="min",
         factor=train_conf["lr_schedule"]["factor"],
         patience=train_conf["lr_schedule"]["patience"],
@@ -194,6 +210,8 @@ def train(model_conf, train_conf, data_conf):
     while True:
         epoch_start = time.perf_counter()
         loss_dict = {}
+        pretrain = pretrain_epochs and epoch <= pretrain_epochs
+        optimizer = optimizer_pretrain if pretrain else optimizer_main
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -207,7 +225,12 @@ def train(model_conf, train_conf, data_conf):
 
             optimizer.step()
             loss = loss_dict["loss"].item()
-            curr_lr = scheduler.get_last_lr()[0]
+            if pretrain:
+                curr_lr = [0.0, lr_head]
+            else:
+                curr_lr = scheduler.get_last_lr()
+            if len(curr_lr) == 1:
+                curr_lr = curr_lr[0]
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
         lrs.append(curr_lr)
@@ -243,7 +266,8 @@ def train(model_conf, train_conf, data_conf):
 
         check_loss_value = train_loss[-1] if calculate_epoch_loss else loss
 
-        scheduler.step(check_loss_value)
+        if not pretrain:
+            scheduler.step(check_loss_value)
         print(
             f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
         )
