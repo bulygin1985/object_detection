@@ -36,6 +36,6 @@
     "is_download": false,
     "class_amount": 20,
     "images_folder": "../VOC/VOCdevkit/VOC2007/JPEGImages",
-    "ann_file": "../VOC_COCO/pascal_val2007.json"
+    "ann_file": "../VOC_COCO/pascal_trainval2007.json"
   }
 }

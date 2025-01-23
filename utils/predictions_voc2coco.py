@@ -3,7 +3,7 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
-
+import json
 import os
 from collections import namedtuple
 
@@ -13,6 +13,7 @@ from load_model import load_model
 from predictions import get_predictions
 from torch.utils.data import Subset
 from torchvision.transforms import v2 as transforms
+from tqdm import tqdm
 
 from data.dataset import Dataset
 from models.centernet import ModelBuilder
@@ -21,7 +22,6 @@ input_height = input_width = 256
 Img_info = namedtuple("Img_info", ["id", "file_name", "height", "width"])
 
 
-# todo (AA): Move it to a separate file
 def prepare_dataset():
     # Load VOC dataset
     dataset = torchvision.datasets.VOCDetection(
@@ -53,7 +53,7 @@ def prepare_dataset():
     return {"images_info": imgs_info, "annotations": dataset_val}
 
 
-def convert_predictions_to_coco_format(img_filenames, preds):
+def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = None):
     # [{
     #     "image_id": int,
     #     "category_id": int,
@@ -64,24 +64,33 @@ def convert_predictions_to_coco_format(img_filenames, preds):
     results = []
 
     pred_shape = preds[0].squeeze().shape
-
     num_categories = pred_shape[0] - 4
-    for filename, pred in zip(img_filenames, preds):
-        squeezed_pred = pred.squeeze()
-        print(filename)
-        for category in range(num_categories):
-            for i in range(pred_shape[1]):
-                for j in range(pred_shape[2]):
-                    img_id, _ = os.path.splitext(filename)
-                    box = squeezed_pred[num_categories:, i, j].tolist()
-                    results.append(
-                        {
-                            "image_id": int(img_id),
-                            "category_id": category,
-                            "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],
-                            "score": squeezed_pred[category, i, j],
-                        }
-                    )
+
+    total = len(img_filenames)
+
+    with tqdm(total=total) as pbar:
+        for filename, pred in zip(img_filenames, preds):
+            squeezed_pred = pred.squeeze()
+            for category in range(num_categories):
+                for i in range(pred_shape[1]):
+                    for j in range(pred_shape[2]):
+                        img_id, _ = os.path.splitext(filename)
+                        box = squeezed_pred[num_categories:, i, j].tolist()
+                        results.append(
+                            {
+                                "image_id": int(img_id),
+                                "category_id": category,
+                                "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],
+                                "score": squeezed_pred[category, i, j].item(),
+                            }
+                        )
+            pbar.update(1)
+
+    print("Store result in file: ", output_path, "\n")
+    if output_path is not None:
+        with open(output_path, "w") as f:
+            json.dump(results, f)
+
     return results
 
 
@@ -107,4 +116,8 @@ if __name__ == "__main__":
 
     img_filenames = [elem.file_name for elem in dataset["images_info"]]
 
-    _ = convert_predictions_to_coco_format(img_filenames, predictions)
+    _ = convert_predictions_to_coco_format(
+        img_filenames,
+        predictions,
+        "../VOC_COCO/pascal_trainval2007_predictions.json"
+    )
