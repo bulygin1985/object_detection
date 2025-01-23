@@ -15,7 +15,7 @@ def evaluate(
         img_ids=None,
         cat_ids=None,
         ann_type: Literal["segm", "bbox", "keypoints"] = "bbox"
-):
+) -> list[dict]:
     assert not(model_predictions and model_predictions_object), \
         "Error: only one of 'model_predictions' and 'model_predictions_object' may be provided"
     assert (model_predictions or model_predictions_object), \
@@ -71,7 +71,7 @@ def evaluate(
     return coco_eval.stats
 
 
-def __main__():
+if __name__ == "__main__":
     _ = evaluate(
         ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
         model_predictions="data/predictions/predictions.json"
