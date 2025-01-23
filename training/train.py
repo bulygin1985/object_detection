@@ -107,6 +107,26 @@ def calculate_loss(model, data, batch_size=32, num_workers=0):
     return loss / count
 
 
+def name_fits(name, include_patterns=None, exclude_patterns=None):
+    """Check if name has any of include prefixes and does not have all exclude prefixes."""
+    if include_patterns and not any([p in name for p in include_patterns]):
+        return False
+    if exclude_patterns and not all([p not in name for p in exclude_patterns]):
+        return False
+    return True
+
+
+def filter_named_values_by_prefix(
+    named_values, include_prefixes=None, exclude_prefixes=None
+):
+    """Filter sequence (name, value) for name to have one of prefixes and none of exclude prefixes."""
+    return [
+        p
+        for name, p in named_values
+        if name_fits(name, include_prefixes, exclude_prefixes)
+    ]
+
+
 def train(model_conf, train_conf, data_conf):
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
@@ -166,8 +186,29 @@ def train(model_conf, train_conf, data_conf):
     lr = train_conf["lr"]
     lr_backbone = train_conf.get("lr_backbone", lr)
     lr_head = train_conf.get("lr_head", lr)
-    trainable_backbone_parameters = model.backbone.parameters()
+
     pretrain_epochs = train_conf.get("freeze_backbone_epochs")
+
+    bb_train_params_prefix_include = train_conf.get(
+        "backbone_trainable_params_prefix_include"
+    )
+    bb_train_params_prefix_exclude = train_conf.get(
+        "backbone_trainable_params_prefix_exclude"
+    )
+    if bb_train_params_prefix_exclude or bb_train_params_prefix_include:
+        trainable_backbone_params = filter_named_values_by_prefix(
+            model.backbone.named_parameters(),
+            bb_train_params_prefix_include,
+            bb_train_params_prefix_exclude,
+        )
+        print("Filter backbone trainable parameters:")
+        print(f"   include: {bb_train_params_prefix_include}")
+        print(f"   exclude: {bb_train_params_prefix_exclude}")
+        print(
+            f"   trainable {len(trainable_backbone_params)} of {len(list(model.backbone.parameters()))}"
+        )
+    else:
+        trainable_backbone_params = model.backbone.parameters()
 
     def create_scheduler(optimizer):
         return torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -187,7 +228,7 @@ def train(model_conf, train_conf, data_conf):
         optimizer = torch.optim.Adam(
             [
                 {"params": model.head.parameters(), "lr": lr_head},
-                {"params": trainable_backbone_parameters, "lr": lr_backbone},
+                {"params": trainable_backbone_params, "lr": lr_backbone},
             ]
         )
         scheduler = create_scheduler(optimizer)
@@ -268,7 +309,7 @@ def train(model_conf, train_conf, data_conf):
         if pretrain:
             if epoch == pretrain_epochs:
                 optimizer.add_param_group(
-                    {"params": trainable_backbone_parameters, "lr": lr_backbone}
+                    {"params": trainable_backbone_params, "lr": lr_backbone}
                 )
                 scheduler = create_scheduler(optimizer)
         else:
