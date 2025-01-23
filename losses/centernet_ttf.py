@@ -31,7 +31,6 @@ class CenternetTTFLoss(nn.Module):
         self.reg_loss = loss_dict.get("reg_loss", "l1")
         self.lambda_size = loss_dict.get("lambda_size", 0.1)
         self.lambda_cls = loss_dict.get("lambda_cls", 1.0)
-        print("loss_dict = {}".format(loss_dict))
         self.delta = 1e-5
 
         self._losses = OrderedDict({k: 0.0 for k in ["loss_cls", "loss_box", "loss"]})
