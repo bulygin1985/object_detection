@@ -166,31 +166,31 @@ def train(model_conf, train_conf, data_conf):
     lr = train_conf["lr"]
     lr_backbone = train_conf.get("lr_backbone", lr)
     lr_head = train_conf.get("lr_head", lr)
-    if lr_backbone == lr_head:
-        optimizer_main = torch.optim.Adam(model.parameters(), lr=lr)
-    else:
-        optimizer_main = torch.optim.Adam(
-            [
-                {"params": model.backbone.parameters(), "lr": lr_backbone},
-                {"params": model.head.parameters(), "lr": lr_head},
-            ],
-            lr=lr,
+    trainable_backbone_parameters = model.backbone.parameters()
+    pretrain_epochs = train_conf.get("freeze_backbone_epochs")
+
+    def create_scheduler(optimizer):
+        return torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=train_conf["lr_schedule"]["factor"],
+            patience=train_conf["lr_schedule"]["patience"],
+            threshold=1e-4,
+            threshold_mode="rel",
+            cooldown=1,
+            min_lr=train_conf["lr_schedule"]["min_lr"],
         )
 
-    pretrain_epochs = train_conf.get("freeze_backbone_epochs")
     if pretrain_epochs:
-        optimizer_pretrain = torch.optim.Adam(model.head.parameters(), lr=lr_head)
-
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer_main,
-        mode="min",
-        factor=train_conf["lr_schedule"]["factor"],
-        patience=train_conf["lr_schedule"]["patience"],
-        threshold=1e-4,
-        threshold_mode="rel",
-        cooldown=1,
-        min_lr=train_conf["lr_schedule"]["min_lr"],
-    )
+        optimizer = torch.optim.Adam(model.head.parameters(), lr=lr_head)
+    else:
+        optimizer = torch.optim.Adam(
+            [
+                {"params": model.head.parameters(), "lr": lr_head},
+                {"params": trainable_backbone_parameters, "lr": lr_backbone},
+            ]
+        )
+        scheduler = create_scheduler(optimizer)
 
     model.train(True)
 
@@ -211,7 +211,6 @@ def train(model_conf, train_conf, data_conf):
         epoch_start = time.perf_counter()
         loss_dict = {}
         pretrain = pretrain_epochs and epoch <= pretrain_epochs
-        optimizer = optimizer_pretrain if pretrain else optimizer_main
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -266,7 +265,13 @@ def train(model_conf, train_conf, data_conf):
 
         check_loss_value = train_loss[-1] if calculate_epoch_loss else loss
 
-        if not pretrain:
+        if pretrain:
+            if epoch == pretrain_epochs:
+                optimizer.add_param_group(
+                    {"params": trainable_backbone_parameters, "lr": lr_backbone}
+                )
+                scheduler = create_scheduler(optimizer)
+        else:
             scheduler.step(check_loss_value)
         print(
             f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
