@@ -128,6 +128,8 @@ def filter_named_values_by_prefix(
 
 
 def train(model_conf, train_conf, data_conf):
+    torch.manual_seed(42)
+
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
     print(f"Selected training image_set: {image_set_train}")
@@ -187,7 +189,7 @@ def train(model_conf, train_conf, data_conf):
     lr_backbone = train_conf.get("lr_backbone", lr)
     lr_head = train_conf.get("lr_head", lr)
 
-    pretrain_epochs = train_conf.get("freeze_backbone_epochs")
+    head_pretrain_epochs = train_conf.get("head_pretrain_epochs")
 
     bb_train_params_patterns_include = train_conf.get(
         "backbone_trainable_params_patterns_include"
@@ -222,17 +224,18 @@ def train(model_conf, train_conf, data_conf):
             min_lr=train_conf["lr_schedule"]["min_lr"],
         )
 
-    if pretrain_epochs:
-        lr_head_pretrain = train_conf.get("lr_head_pretrain", lr_head)
-        optimizer = torch.optim.Adam(model.head.parameters(), lr=lr_head_pretrain)
+    if head_pretrain_epochs:
+        lr_head_start = train_conf.get("lr_head_pretrain", lr_head)
+        lr_backbone_start = 0.0
     else:
-        optimizer = torch.optim.Adam(
-            [
-                {"params": model.head.parameters(), "lr": lr_head},
-                {"params": trainable_backbone_params, "lr": lr_backbone},
-            ]
-        )
-        scheduler = create_scheduler(optimizer)
+        lr_head_start, lr_backbone_start = lr_head, lr_backbone
+
+    optimizer = torch.optim.Adam(
+        [
+            {"params": trainable_backbone_params, "lr": lr_backbone_start},
+            {"params": model.head.parameters(), "lr": lr_head_start},
+        ]
+    )
 
     model.train(True)
 
@@ -242,17 +245,27 @@ def train(model_conf, train_conf, data_conf):
 
     epoch = 1
 
-    train_loss = []
-    val_loss = []
+    train_loss_history = []
+    val_loss_history = []
+    best_val_loss_history = []
     lr_head_history = []
     lr_backbone_history = []
+    best_val_loss = 1e9
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
     save_best_model = train_conf.get("save_best_model", True)
 
     while True:
         epoch_start = time.perf_counter()
-        pretrain = pretrain_epochs and epoch <= pretrain_epochs
+        pretrain = head_pretrain_epochs and epoch <= head_pretrain_epochs
+
+        if not pretrain and epoch == (head_pretrain_epochs + 1):
+            if head_pretrain_epochs:
+                # switch optimizer LRs
+                optimizer.param_groups[0]["lr"] = lr_backbone
+                optimizer.param_groups[1]["lr"] = lr_head
+            scheduler = create_scheduler(optimizer)
+
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -266,57 +279,54 @@ def train(model_conf, train_conf, data_conf):
 
             optimizer.step()
             loss = loss_dict["loss"].item()
-            if pretrain:
-                curr_lr = [lr_head_pretrain, 0.]
-            else:
-                curr_lr = scheduler.get_last_lr()
+            curr_lr = [optimizer.param_groups[0]["lr"], optimizer.param_groups[1]["lr"]]
             lr_to_show = curr_lr[0] if len(curr_lr) == 1 else curr_lr
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={lr_to_show}")
 
-        lr_head_history.append(curr_lr[0])
-        lr_backbone_history.append(curr_lr[1])
+        lr_backbone_history.append(curr_lr[0])
+        lr_head_history.append(curr_lr[1])
 
+        print(f"= = = = = = = = = =")
         if calculate_epoch_loss:
-            train_loss.append(
+            train_loss_history.append(
                 calculate_loss(model, train_data, batch_size, num_workers)
             )
-            val_loss.append(calculate_loss(model, val_data, batch_size, num_workers))
-            print(f"= = = = = = = = = =")
-            print(
-                f"Epoch {epoch} train loss = {train_loss[-1]}, val loss = {val_loss[-1]}"
+            val_loss_history.append(
+                calculate_loss(model, val_data, batch_size, num_workers)
             )
+            if val_loss_history[-1] < best_val_loss:
+                best_val_loss = val_loss_history[-1]
+                if save_best_model:
+                    save_model(
+                        model,
+                        model_conf["weights_path"],
+                        tag=tag + "_best",
+                        backbone=model_conf["backbone"]["name"],
+                    )
+
+            print(
+                f"Epoch {epoch} train loss = {train_loss_history[-1]:.5f}, val loss = {val_loss_history[-1]:.5f}, best val loss = {best_val_loss:.5f}"
+            )
+
+            best_val_loss_history.append(best_val_loss)
             loss_df = pd.DataFrame(
                 {
                     "epoch": range(1, epoch + 1),
-                    "train_loss": train_loss,
-                    "val_loss": val_loss,
+                    "train_loss": train_loss_history,
+                    "val_loss": val_loss_history,
+                    "best_val_loss": best_val_loss_history,
                     "lr_head": lr_head_history,
-                    "lr_backbone": lr_backbone_history
+                    "lr_backbone": lr_backbone_history,
                 }
             )
             loss_df.to_csv("losses.csv", index=False)
-            if save_best_model and val_loss[-1] == min(val_loss):
-                save_model(
-                    model,
-                    model_conf["weights_path"],
-                    tag=tag + "_best",
-                    backbone=model_conf["backbone"]["name"],
-                )
 
         if criteria_satisfied(loss, epoch):
             break
 
-        check_loss_value = train_loss[-1] if calculate_epoch_loss else loss
+        check_loss_value = train_loss_history[-1] if calculate_epoch_loss else loss
 
-        if pretrain:
-            if epoch == pretrain_epochs:
-                # switch optimizer parameters
-                optimizer.param_groups[0]["lr"] = lr_head # this is ok until we have pretrain scheduler
-                optimizer.add_param_group(
-                    {"params": trainable_backbone_params, "lr": lr_backbone}
-                )
-                scheduler = create_scheduler(optimizer)
-        else:
+        if not pretrain:
             scheduler.step(check_loss_value)
         print(
             f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
@@ -325,7 +335,7 @@ def train(model_conf, train_conf, data_conf):
         epoch += 1
 
     if calculate_epoch_loss:
-        tl = torch.Tensor(val_loss)
+        tl = torch.Tensor(val_loss_history)
         best_idx = torch.argmin(tl).item()
         best_val = tl[best_idx].item()
         print(f"Best validation loss = {best_val} was reached at {best_idx+1} epoch.")
