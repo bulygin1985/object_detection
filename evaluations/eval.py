@@ -2,6 +2,7 @@ import json
 from numpy import array
 from time import time
 from typing import Literal
+from collections import defaultdict
 
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -12,8 +13,8 @@ def evaluate(
         model_predictions_object: dict = None,
         ground_truth_annotations: str = None,
         ground_truth_object: dict = None,
-        img_ids=None,
-        cat_ids=None,
+        img_ids: list = None,
+        cat_ids: list = None,
         ann_type: Literal["segm", "bbox", "keypoints"] = "bbox"
 ) -> list[dict]:
     assert not(model_predictions and model_predictions_object), \
@@ -34,7 +35,27 @@ def evaluate(
             'annotation file format {} not supported'.format(type(ground_truth_object)))
         print('Done (t={:0.2f}s)'.format(time() - tic))
 
-    # todo (AA): filter ground_truth_object by img_ids and cat_ids
+    # filter ground_truth_object by img_ids and cat_ids
+    if img_ids:
+        ground_truth_object["annotations"] = \
+            [elem for elem in ground_truth_object.get("annotations", []) if elem["image_id"] in img_ids]
+        ground_truth_object["images"] = \
+            [elem for elem in ground_truth_object.get("images", []) if elem["id"] in img_ids]
+
+    if cat_ids:
+        new_img_ids = set(elem["id"] for elem in ground_truth_object.get("images", []))
+
+        cat_to_imgs = defaultdict(list)
+        for ann in ground_truth_object.get("annotations", []):
+            cat_to_imgs[ann["category_id"]].append(ann["image_id"])
+
+        for i, cat_id in enumerate(cat_ids):
+            new_img_ids &= set(cat_to_imgs[cat_id])
+
+        ground_truth_object["annotations"] = \
+            [elem for elem in ground_truth_object.get("annotations", []) if elem["image_id"] in new_img_ids]
+        ground_truth_object["images"] = \
+            [elem for elem in ground_truth_object.get("images", []) if elem["id"] in new_img_ids]
 
     coco_gt = COCO()
     coco_gt.dataset = ground_truth_object
@@ -44,7 +65,13 @@ def evaluate(
         with open(model_predictions) as f:
             model_predictions_object = json.load(f)
 
-    # todo (AA): filter model_predictions_object by img_ids and cat_ids
+    # filter model_predictions_object by img_ids and cat_ids
+    if img_ids:
+        model_predictions_object = \
+            [elem for elem in model_predictions_object if elem["image_id"] in img_ids]
+    if cat_ids:
+        model_predictions_object = \
+            [elem for elem in model_predictions_object if elem.get("category_id", []) in cat_ids]
 
     model_predictions_list = [
         [
