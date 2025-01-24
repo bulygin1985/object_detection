@@ -189,21 +189,21 @@ def train(model_conf, train_conf, data_conf):
 
     pretrain_epochs = train_conf.get("freeze_backbone_epochs")
 
-    bb_train_params_prefix_include = train_conf.get(
-        "backbone_trainable_params_prefix_include"
+    bb_train_params_patterns_include = train_conf.get(
+        "backbone_trainable_params_patterns_include"
     )
-    bb_train_params_prefix_exclude = train_conf.get(
-        "backbone_trainable_params_prefix_exclude"
+    bb_train_params_patterns_exclude = train_conf.get(
+        "backbone_trainable_params_patterns_exclude"
     )
-    if bb_train_params_prefix_exclude or bb_train_params_prefix_include:
+    if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
         trainable_backbone_params = filter_named_values_by_prefix(
             model.backbone.named_parameters(),
-            bb_train_params_prefix_include,
-            bb_train_params_prefix_exclude,
+            bb_train_params_patterns_include,
+            bb_train_params_patterns_exclude,
         )
         print("Filter backbone trainable parameters:")
-        print(f"   include: {bb_train_params_prefix_include}")
-        print(f"   exclude: {bb_train_params_prefix_exclude}")
+        print(f"   include: {bb_train_params_patterns_include}")
+        print(f"   exclude: {bb_train_params_patterns_exclude}")
         print(
             f"   trainable {len(trainable_backbone_params)} of {len(list(model.backbone.parameters()))}"
         )
@@ -223,7 +223,8 @@ def train(model_conf, train_conf, data_conf):
         )
 
     if pretrain_epochs:
-        optimizer = torch.optim.Adam(model.head.parameters(), lr=lr_head)
+        lr_head_pretrain = train_conf.get("lr_head_pretrain", lr_head)
+        optimizer = torch.optim.Adam(model.head.parameters(), lr=lr_head_pretrain)
     else:
         optimizer = torch.optim.Adam(
             [
@@ -243,14 +244,14 @@ def train(model_conf, train_conf, data_conf):
 
     train_loss = []
     val_loss = []
-    lrs = []
+    lr_head_history = []
+    lr_backbone_history = []
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
     save_best_model = train_conf.get("save_best_model", True)
 
     while True:
         epoch_start = time.perf_counter()
-        loss_dict = {}
         pretrain = pretrain_epochs and epoch <= pretrain_epochs
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
@@ -266,14 +267,14 @@ def train(model_conf, train_conf, data_conf):
             optimizer.step()
             loss = loss_dict["loss"].item()
             if pretrain:
-                curr_lr = [0.0, lr_head]
+                curr_lr = [lr_head_pretrain, 0.]
             else:
                 curr_lr = scheduler.get_last_lr()
-            if len(curr_lr) == 1:
-                curr_lr = curr_lr[0]
-            print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
+            lr_to_show = curr_lr[0] if len(curr_lr) == 1 else curr_lr
+            print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={lr_to_show}")
 
-        lrs.append(curr_lr)
+        lr_head_history.append(curr_lr[0])
+        lr_backbone_history.append(curr_lr[1])
 
         if calculate_epoch_loss:
             train_loss.append(
@@ -289,7 +290,8 @@ def train(model_conf, train_conf, data_conf):
                     "epoch": range(1, epoch + 1),
                     "train_loss": train_loss,
                     "val_loss": val_loss,
-                    "lr": lrs,
+                    "lr_head": lr_head_history,
+                    "lr_backbone": lr_backbone_history
                 }
             )
             loss_df.to_csv("losses.csv", index=False)
@@ -308,6 +310,8 @@ def train(model_conf, train_conf, data_conf):
 
         if pretrain:
             if epoch == pretrain_epochs:
+                # switch optimizer parameters
+                optimizer.param_groups[0]["lr"] = lr_head # this is ok until we have pretrain scheduler
                 optimizer.add_param_group(
                     {"params": trainable_backbone_params, "lr": lr_backbone}
                 )
