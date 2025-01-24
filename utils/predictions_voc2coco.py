@@ -3,6 +3,7 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
+
 import json
 import os
 from collections import namedtuple
@@ -80,7 +81,12 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
                             {
                                 "image_id": int(img_id),
                                 "category_id": category,
-                                "bbox": [box[0], box[1], box[2] - box[0], box[3] - box[1]],
+                                "bbox": [
+                                    box[0],
+                                    box[1],
+                                    box[2] - box[0],
+                                    box[3] - box[1],
+                                ],
                                 "score": squeezed_pred[category, i, j].item(),
                             }
                         )
@@ -117,7 +123,5 @@ if __name__ == "__main__":
     img_filenames = [elem.file_name for elem in dataset["images_info"]]
 
     _ = convert_predictions_to_coco_format(
-        img_filenames,
-        predictions,
-        "../VOC_COCO/pascal_trainval2007_predictions.json"
+        img_filenames, predictions, "../VOC_COCO/pascal_trainval2007_predictions.json"
     )
