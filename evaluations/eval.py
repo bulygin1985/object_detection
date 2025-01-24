@@ -125,5 +125,5 @@ def evaluate(
 if __name__ == "__main__":
     _ = evaluate(
         ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
-        model_predictions="data/predictions/predictions.json",
+        model_predictions="../VOC_COCO/pascal_trainval2007_predictions.json",
     )
