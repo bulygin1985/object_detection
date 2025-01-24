@@ -26,7 +26,7 @@ Img_info = namedtuple("Img_info", ["id", "file_name", "height", "width"])
 def prepare_dataset():
     # Load VOC dataset
     dataset = torchvision.datasets.VOCDetection(
-        root="../VOC", year="2007", image_set="trainval", download=False
+        root="../VOC", year="2007", image_set="train", download=False
     )
 
     dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset)
@@ -123,5 +123,5 @@ if __name__ == "__main__":
     img_filenames = [elem.file_name for elem in dataset["images_info"]]
 
     _ = convert_predictions_to_coco_format(
-        img_filenames, predictions, "../VOC_COCO/pascal_trainval2007_predictions.json"
+        img_filenames, predictions, "../VOC_COCO/pascal_train2007_predictions.json"
     )

@@ -61,7 +61,7 @@ class MAPEvaluator:
         self.coco_eval = None
 
     def filter_input(self, img_ids: list = None, cat_ids: list = None):
-        # filter ground_truth_object by img_ids and cat_ids
+        """Filter ground_truth_object by img_ids and cat_ids"""
         if img_ids:
             self.img_ids = img_ids
 
@@ -151,8 +151,9 @@ class MAPEvaluator:
 if __name__ == "__main__":
     evaluator = MAPEvaluator(
         ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
-        model_predictions="../VOC_COCO/pascal_trainval2007_predictions.json",
+        model_predictions="../VOC_COCO/pascal_train2007_predictions.json",
     )
 
-    evaluator.filter_input(img_ids=[1], cat_ids=[1])
+    # the list [12, 17, 23, 26, 32, 33, 34, 35, 36, 42] contains first 10 image ids of train pascal VOC dataset
+    evaluator.filter_input(img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None)
     _ = evaluator.evaluate()
