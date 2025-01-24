@@ -6,11 +6,12 @@ from typing import Literal
 from numpy import array
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-
+from torchvision.transforms import v2 as v2_transforms
 
 class MAPEvaluator:
     def __init__(
         self,
+        transforms: v2_transforms.Compose = None,
         model_predictions: str = None,
         model_predictions_object: dict = None,
         ground_truth_annotations: str = None,
@@ -51,7 +52,8 @@ class MAPEvaluator:
             with open(model_predictions) as f:
                 self.model_predictions_object = json.load(f)
 
-        self.ground_truth_filtered = self.ground_truth_object
+        self.transforms = transforms
+        self.ground_truth_filtered = self.ground_truth_object = self.transform_ground_truth()
         self.model_predictions_filtered = self.model_predictions_object
 
         self.img_ids = []
@@ -115,6 +117,9 @@ class MAPEvaluator:
                 if elem.get("category_id", []) in cat_ids
             ]
 
+    def transform_ground_truth(self):
+        return self.transforms(self.ground_truth_object) if self.transforms else self.ground_truth_object
+
     def evaluate(self) -> list[dict]:
         model_predictions = array(
             [
@@ -149,9 +154,16 @@ class MAPEvaluator:
 
 
 if __name__ == "__main__":
+    v2_transforms = v2_transforms.Compose(
+        [
+            v2_transforms.Resize(size=(256, 256)),
+        ]
+    )
+
     evaluator = MAPEvaluator(
         ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
         model_predictions="../VOC_COCO/pascal_train2007_predictions.json",
+        transforms=v2_transforms,
     )
 
     # the list [12, 17, 23, 26, 32, 33, 34, 35, 36, 42] contains first 10 image ids of train pascal VOC dataset
