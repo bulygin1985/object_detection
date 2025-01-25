@@ -1,8 +1,8 @@
 import json
 from collections import defaultdict
-from time import time
-from typing import Literal, Tuple, Any
 from pathlib import Path
+from time import time
+from typing import Any, Literal, Tuple
 
 import torch
 from jedi.inference.gradual.typing import Callable
@@ -13,9 +13,9 @@ from torchvision.transforms import v2 as v2_transforms
 
 
 def get_inverse_resize_transformations(
-        ground_truth_images_info: list[dict[str, Any]],
-        transformed_width: int,
-        transformed_height: int,
+    ground_truth_images_info: list[dict[str, Any]],
+    transformed_width: int,
+    transformed_height: int,
 ):
     def get_bbox_resizer(original_width, original_height):
         def bbox_resizer(pred):
@@ -33,8 +33,7 @@ def get_inverse_resize_transformations(
     transformations = {}
     for img_info in ground_truth_images_info:
         transformations[img_info["id"]] = get_bbox_resizer(
-            original_width=img_info["width"],
-            original_height=img_info["height"]
+            original_width=img_info["width"], original_height=img_info["height"]
         )
 
     return transformations
@@ -149,7 +148,10 @@ class MAPEvaluator:
 
     def apply_predictions_transformations(self, transformations: dict):
         """Apply transformations to model_predictions_object"""
-        self.model_predictions_filtered = [transformations[elem["image_id"]](elem) for elem in self.model_predictions_filtered]
+        self.model_predictions_filtered = [
+            transformations[elem["image_id"]](elem)
+            for elem in self.model_predictions_filtered
+        ]
 
     def evaluate(self) -> list[dict]:
         model_predictions = array(
@@ -197,12 +199,14 @@ if __name__ == "__main__":
     )
 
     # the list [12, 17, 23, 26, 32, 33, 34, 35, 36, 42] contains first 10 image ids of train pascal VOC dataset
-    evaluator.filter_input(img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None)
+    evaluator.filter_input(
+        img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None
+    )
 
     inverse_transfomations = get_inverse_resize_transformations(
         evaluator.ground_truth_object["images"],
         transformed_width=256,
-        transformed_height=256
+        transformed_height=256,
     )
 
     evaluator.apply_predictions_transformations(inverse_transfomations)
