@@ -1,11 +1,8 @@
 import json
 from collections import defaultdict
-from pathlib import Path
 from time import time
 from typing import Any, Literal, Tuple
 
-import torch
-from jedi.inference.gradual.typing import Callable
 from numpy import array
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
