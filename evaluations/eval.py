@@ -1,39 +1,12 @@
 import json
 from collections import defaultdict
 from time import time
-from typing import Any, Literal, Tuple
+from typing import Literal
 
 from numpy import array
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from torchvision.transforms import v2 as v2_transforms
-
-
-def get_inverse_resize_transformations(
-    ground_truth_images_info: list[dict[str, Any]],
-    transformed_width: int,
-    transformed_height: int,
-):
-    def get_bbox_resizer(original_width, original_height):
-        def bbox_resizer(pred):
-            x, y, w, h = pred["bbox"]
-            x *= original_width / transformed_width
-            y *= original_height / transformed_height
-            w *= original_width / transformed_width
-            h *= original_height / transformed_height
-
-            pred["bbox"] = [x, y, w, h]
-            return pred
-
-        return bbox_resizer
-
-    transformations = {}
-    for img_info in ground_truth_images_info:
-        transformations[img_info["id"]] = get_bbox_resizer(
-            original_width=img_info["width"], original_height=img_info["height"]
-        )
-
-    return transformations
 
 
 class MAPEvaluator:
@@ -143,13 +116,6 @@ class MAPEvaluator:
                 if elem.get("category_id", []) in cat_ids
             ]
 
-    def apply_predictions_transformations(self, transformations: dict):
-        """Apply transformations to model_predictions_object"""
-        self.model_predictions_filtered = [
-            transformations[elem["image_id"]](elem)
-            for elem in self.model_predictions_filtered
-        ]
-
     def evaluate(self) -> list[dict]:
         model_predictions = array(
             [
@@ -199,13 +165,5 @@ if __name__ == "__main__":
     evaluator.filter_input(
         img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None
     )
-
-    inverse_transfomations = get_inverse_resize_transformations(
-        evaluator.ground_truth_object["images"],
-        transformed_width=256,
-        transformed_height=256,
-    )
-
-    evaluator.apply_predictions_transformations(inverse_transfomations)
 
     _ = evaluator.evaluate()
