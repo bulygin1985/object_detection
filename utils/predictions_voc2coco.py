@@ -76,15 +76,17 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
                     for j in range(pred_shape[2]):
                         img_id, _ = os.path.splitext(filename)
                         box = pred[num_categories:, i, j].tolist()
+
+                        # todo (AA): here
                         results.append(
                             {
                                 "image_id": int(img_id),
                                 "category_id": category + 1,
                                 "bbox": [
-                                    box[0],
-                                    box[1],
-                                    box[2] - box[0],
-                                    box[3] - box[1],
+                                    i * 4.0 - box[0],
+                                    j * 4.0 - box[1],
+                                    box[2] + box[0],
+                                    box[3] + box[1],
                                 ],
                                 "score": pred[category, i, j].item(),
                             }
