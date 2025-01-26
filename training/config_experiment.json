@@ -1,0 +1,57 @@
+{
+  "model": {
+    "alpha": 1.0,
+    "weights_path": null,
+    "backbone": {
+      "name": "efficientnet_b0",
+      "pretrained_weights": "DEFAULT"
+    },
+    "head": {
+      "filters_size": [
+        256,
+        128,
+        64
+      ],
+      "head_layers": 3
+    }
+  },
+  "train": {
+    "is_overfit": false,
+    "lr": 2e-2,
+    "lr_backbone": 2e-2,
+    "lr_head": 2e-2,
+    "lr_head_pretrain": 2e-2,
+    "head_pretrain_epochs": 125,
+    "backbone_trainable_params_patterns_include": null,
+    "backbone_trainable_params_patterns_exclude": [
+      "features.1",
+      "features.2",
+      "features.3",
+      "features.4",
+      "features.5",
+      "features.6"
+    ],
+    "batch_size": 48,
+    "subset_len": null,
+    "val_subset_len": null,
+    "calculate_epoch_loss": true,
+    "num_workers": 4,
+    "data_augmentation": {
+      "random_flip_horizontal": true,
+      "random_resize_crop_scale": [0.5, 1.0],
+      "random_resize_crop_ratio": [0.6667, 1.5]
+    },
+    "lr_schedule": {
+      "patience": 3,
+      "factor": 0.2,
+      "min_lr": 1e-5
+    },
+    "stop_criteria": {
+      "loss": null,
+      "epoch": 200
+    }
+  },
+  "data": {
+    "is_download": false
+  }
+}
