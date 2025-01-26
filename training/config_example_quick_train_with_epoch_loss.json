@@ -21,6 +21,13 @@
     "subset_len": 128,
     "val_subset_len": 96,
     "calculate_epoch_loss": true,
+    "num_workers": 6,
+    "data_augmentation": {
+      "random_flip_horizontal": true,
+      "color_jitter_brightness": 0.25,
+      "random_resize_crop_scale": [0.5, 1.0],
+      "random_resize_crop_ratio": [0.6667, 1.5]
+    },
     "lr_schedule": {
       "patience": 10,
       "factor": 0.2,
