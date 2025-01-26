@@ -70,7 +70,7 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
 
     with tqdm(total=total) as pbar:
         for filename, pred in zip(img_filenames, preds):
-            for category in range(1, num_categories):
+            for category in range(num_categories):
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
                         img_id, _ = os.path.splitext(filename)
@@ -78,7 +78,7 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
                         results.append(
                             {
                                 "image_id": int(img_id),
-                                "category_id": category,
+                                "category_id": category + 1,
                                 "bbox": [
                                     box[0],
                                     box[1],
