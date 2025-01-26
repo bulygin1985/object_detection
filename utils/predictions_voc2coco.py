@@ -3,6 +3,7 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
+
 import json
 import os
 from collections import namedtuple
@@ -106,21 +107,27 @@ def get_inverse_resize_transformations(
 ):
     def get_bbox_resizer(num_cat, original_width, original_height):
         def bbox_resizer(pred):
-            pred[num_cat, :, :] = pred[num_cat, :, :] * original_width / transformed_width
-            pred[num_cat + 1, :, :] = pred[num_cat + 1, :, :] * original_height / transformed_height
-            pred[num_cat + 2, :, :] = pred[num_cat + 2, :, :] * original_width / transformed_width
-            pred[num_cat + 3, :, :] = pred[num_cat + 3, :, :] * original_height / transformed_height
+            pred[num_cat, :, :] = (
+                pred[num_cat, :, :] * original_width / transformed_width
+            )
+            pred[num_cat + 1, :, :] = (
+                pred[num_cat + 1, :, :] * original_height / transformed_height
+            )
+            pred[num_cat + 2, :, :] = (
+                pred[num_cat + 2, :, :] * original_width / transformed_width
+            )
+            pred[num_cat + 3, :, :] = (
+                pred[num_cat + 3, :, :] * original_height / transformed_height
+            )
             return pred
 
         return bbox_resizer
 
     transformations = []
     for img_info in ground_truth_images_info:
-        transformations.append(get_bbox_resizer(
-            num_categories,
-            img_info.width,
-            img_info.height
-        ))
+        transformations.append(
+            get_bbox_resizer(num_categories, img_info.width, img_info.height)
+        )
 
     return transformations
 
@@ -156,8 +163,7 @@ if __name__ == "__main__":
     )
 
     resized_predictions = [
-        transform(pred)
-        for transform, pred in zip(inverse_transfomations, predictions)
+        transform(pred) for transform, pred in zip(inverse_transfomations, predictions)
     ]
 
     img_filenames = [elem.file_name for elem in dataset["images_info"]]
