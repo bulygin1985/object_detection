@@ -78,13 +78,15 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
                         box = pred[num_categories:, i, j].tolist()
 
                         # todo (AA): here
+                        # todo (AA): use constant output_stride_h = 4.0, output_stride_w = 4.0
+                        # todo (AA): change lines i * 4.0 * 500/256 - box[0], j * 4.0 * 333/256 - box[1],
                         results.append(
                             {
                                 "image_id": int(img_id),
                                 "category_id": category + 1,
                                 "bbox": [
-                                    i * 4.0 - box[0],
-                                    j * 4.0 - box[1],
+                                    i * 4.0 * 500/256 - box[0],
+                                    j * 4.0 * 333/256 - box[1],
                                     box[2] + box[0],
                                     box[3] + box[1],
                                 ],
