@@ -17,22 +17,21 @@ python dataset_voc2coco.py /path/to/input/voc/Annotations
 """
 
 import argparse
-import logging
-import json
-import os
 import datetime
+import json
+import logging
+import os
 from pathlib import Path
 from typing import Dict, List
 
 import defusedxml.ElementTree as ET
 from tqdm import tqdm
 
-
 logging.basicConfig(
     filename=f"../logs/dataset_voc2coco_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log",
-    format='%(asctime)s,%(msecs)03d %(name)s %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    level=logging.INFO
+    format="%(asctime)s,%(msecs)03d %(name)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,6 +154,7 @@ def get_image_info(annotation_root):
     }
     return image_info
 
+
 def get_coco_annotation_from_obj(obj, ann_file, label2id, min_area) -> dict:
     label = obj.findtext("name")
     assert label in label2id, f"Error: {label} is not in label2id!"
@@ -165,15 +165,19 @@ def get_coco_annotation_from_obj(obj, ann_file, label2id, min_area) -> dict:
     xmax = int(float(bndbox.findtext("xmax")))
     ymax = int(float(bndbox.findtext("ymax")))
     if xmin >= xmax or ymin >= ymax:
-        logger.warning(f"xmin >= xmax or ymin >= ymax, skipping this bounding box. Annotation file: {ann_file}. "
-                       f"Bounding box {bndbox}")
+        logger.warning(
+            f"xmin >= xmax or ymin >= ymax, skipping this bounding box. Annotation file: {ann_file}. "
+            f"Bounding box {bndbox}"
+        )
         return {}
     o_width = xmax - xmin
     o_height = ymax - ymin
     area = o_width * o_height
     if area <= min_area:
-        logger.warning(f"area <= min_area, skipping this bounding box. Annotation file: {ann_file}."
-                       f"Bounding box {bndbox}")
+        logger.warning(
+            f"area <= min_area, skipping this bounding box. Annotation file: {ann_file}."
+            f"Bounding box {bndbox}"
+        )
         return {}
     ann = {
         "area": area,
@@ -212,7 +216,9 @@ def convert_xmls_to_coco(
             img_info = get_image_info(annotation_root=ann_root)
         except ValueError as e:
             with_issues = True
-            logger.error(f"Cannot get image info for annotation file '{ann_file}' due to the error: {e}")
+            logger.error(
+                f"Cannot get image info for annotation file '{ann_file}' due to the error: {e}"
+            )
             continue
         img_id = img_info["id"]
 
@@ -324,7 +330,6 @@ def main() -> bool:
                 min_area=min_area,
             )
             with_issues |= curr_with_issues
-
 
     if output_form in [JOINED, BOTH]:
         ann_files = [
