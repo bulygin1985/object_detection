@@ -96,8 +96,8 @@ def convert_predictions_to_coco_format(
                                 "image_id": int(img_id),
                                 "category_id": category + 1,
                                 "bbox": [
-                                    (i * output_stride_w - box[0]) * width_scale_factor,
-                                    (j * output_stride_h - box[1])
+                                    (j * output_stride_h - box[0]) * width_scale_factor,
+                                    (i * output_stride_w - box[1])
                                     * height_scale_factor,
                                     (box[2] + box[0]) * width_scale_factor,
                                     (box[3] + box[1]) * height_scale_factor,
@@ -107,7 +107,7 @@ def convert_predictions_to_coco_format(
                         )
             pbar.update(1)
 
-    print("Storing result in file: ", output_path, "...")
+    print(f"Storing result in file: {output_path}...")
     if output_path is not None:
         with open(output_path, "w") as f:
             json.dump(results, f)
