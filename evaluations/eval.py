@@ -8,8 +8,8 @@ from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from torchvision.transforms import v2 as v2_transforms
 
-
 IMG_HEIGHT = IMG_WIDTH = 256
+
 
 class MAPEvaluator:
     def __init__(

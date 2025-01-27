@@ -3,6 +3,7 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
+
 import json
 import os
 from collections import namedtuple
@@ -55,11 +56,11 @@ def prepare_dataset():
 
 
 def convert_predictions_to_coco_format(
-        imgs_info: list[Img_info],
-        preds,
-        output_stride_h: int = 4,
-        output_stride_w: int = 4,
-        output_path: str = None
+    imgs_info: list[Img_info],
+    preds,
+    output_stride_h: int = 4,
+    output_stride_w: int = 4,
+    output_path: str = None,
 ) -> list[dict[str, object]]:
     # [{
     #     "image_id": int,
@@ -83,9 +84,9 @@ def convert_predictions_to_coco_format(
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
                         # get image id from the filename
-                        rev_filename = ''.join(reversed(img_info.filename))
+                        rev_filename = "".join(reversed(img_info.filename))
                         rev_id_part_filename, _, _ = rev_filename.partition("_")
-                        id_part_filename = ''.join(reversed(rev_id_part_filename))
+                        id_part_filename = "".join(reversed(rev_id_part_filename))
                         img_id, _ = os.path.splitext(id_part_filename)
 
                         box = pred[num_categories:, i, j].tolist()
@@ -96,7 +97,8 @@ def convert_predictions_to_coco_format(
                                 "category_id": category + 1,
                                 "bbox": [
                                     (i * output_stride_w - box[0]) * width_scale_factor,
-                                    (j * output_stride_h - box[1]) * height_scale_factor,
+                                    (j * output_stride_h - box[1])
+                                    * height_scale_factor,
                                     (box[2] + box[0]) * width_scale_factor,
                                     (box[3] + box[1]) * height_scale_factor,
                                 ],
@@ -141,5 +143,5 @@ if __name__ == "__main__":
     _ = convert_predictions_to_coco_format(
         dataset["images_info"],
         predictions,
-        output_path="../VOC_COCO/pascal_train2007_predictions.json"
+        output_path="../VOC_COCO/pascal_train2007_predictions.json",
     )
