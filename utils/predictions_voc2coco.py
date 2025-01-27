@@ -18,7 +18,8 @@ from tqdm import tqdm
 from data.dataset import Dataset
 from models.centernet import ModelBuilder
 
-input_height = input_width = 256
+IMG_HEIGHT = IMG_WIDTH = 256
+
 Img_info = namedtuple("Img_info", ["id", "filename", "height", "width"])
 
 
@@ -53,7 +54,13 @@ def prepare_dataset():
     return {"images_info": imgs_info, "annotations": dataset_val}
 
 
-def convert_predictions_to_coco_format(imgs_info: list[Img_info], preds, output_path: str = None):
+def convert_predictions_to_coco_format(
+        imgs_info: list[Img_info],
+        preds,
+        output_stride_h: int = 4,
+        output_stride_w: int = 4,
+        output_path: str = None
+) -> list[dict[str, object]]:
     # [{
     #     "image_id": int,
     #     "category_id": int,
@@ -70,8 +77,8 @@ def convert_predictions_to_coco_format(imgs_info: list[Img_info], preds, output_
 
     with tqdm(total=total) as pbar:
         for img_info, pred in zip(imgs_info, preds):
-            width_scale_factor = img_info.width / 256
-            height_scale_factor = img_info.height / 256
+            width_scale_factor = float(img_info.width / IMG_WIDTH)
+            height_scale_factor = float(img_info.height / IMG_HEIGHT)
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
@@ -83,14 +90,13 @@ def convert_predictions_to_coco_format(imgs_info: list[Img_info], preds, output_
 
                         box = pred[num_categories:, i, j].tolist()
 
-                        # todo (AA): use constant output_stride_h = 4.0, output_stride_w = 4.0
                         results.append(
                             {
                                 "image_id": int(img_id),
                                 "category_id": category + 1,
                                 "bbox": [
-                                    (i * 4.0 - box[0]) * width_scale_factor,
-                                    (j * 4.0 - box[1]) * height_scale_factor,
+                                    (i * output_stride_w - box[0]) * width_scale_factor,
+                                    (j * output_stride_h - box[1]) * height_scale_factor,
                                     (box[2] + box[0]) * width_scale_factor,
                                     (box[3] + box[1]) * height_scale_factor,
                                 ],
@@ -111,7 +117,7 @@ def transform_dataset(dataset):
     """Transform the dataset for visualization"""
     transform = transforms.Compose(
         [
-            transforms.Resize(size=(input_width, input_height)),
+            transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT)),
         ]
     )
 
@@ -133,5 +139,7 @@ if __name__ == "__main__":
     img_filenames = [elem.filename for elem in dataset["images_info"]]
 
     _ = convert_predictions_to_coco_format(
-        dataset["images_info"], predictions, "../VOC_COCO/pascal_train2007_predictions.json"
+        dataset["images_info"],
+        predictions,
+        output_path="../VOC_COCO/pascal_train2007_predictions.json"
     )
