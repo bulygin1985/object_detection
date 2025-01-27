@@ -157,7 +157,7 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
         # todo (AA): log the fact that area < min_area
         return {}
     ann = {
-        "area": o_width * o_height,
+        "area": area,
         "iscrowd": 0,
         "bbox": [xmin, ymin, o_width, o_height],
         "category_id": category_id,

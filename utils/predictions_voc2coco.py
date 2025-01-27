@@ -3,7 +3,6 @@ Convert VOC format predictions to COCO.
 Example to run:
 python predictions_voc2coco.py
 """
-
 import json
 import os
 from collections import namedtuple
@@ -20,7 +19,7 @@ from data.dataset import Dataset
 from models.centernet import ModelBuilder
 
 input_height = input_width = 256
-Img_info = namedtuple("Img_info", ["id", "file_name", "height", "width"])
+Img_info = namedtuple("Img_info", ["id", "filename", "height", "width"])
 
 
 def prepare_dataset():
@@ -43,7 +42,7 @@ def prepare_dataset():
         imgs_info.append(
             Img_info(
                 id=int(id_str),
-                file_name=filename,
+                filename=filename,
                 height=int(ann["size"]["height"]),
                 width=int(ann["size"]["width"]),
             )
@@ -54,7 +53,7 @@ def prepare_dataset():
     return {"images_info": imgs_info, "annotations": dataset_val}
 
 
-def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = None):
+def convert_predictions_to_coco_format(imgs_info: list[Img_info], preds, output_path: str = None):
     # [{
     #     "image_id": int,
     #     "category_id": int,
@@ -67,28 +66,33 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
     pred_shape = preds[0].shape
     num_categories = pred_shape[0] - 4
 
-    total = len(img_filenames)
+    total = len(imgs_info)
 
     with tqdm(total=total) as pbar:
-        for filename, pred in zip(img_filenames, preds):
+        for img_info, pred in zip(imgs_info, preds):
+            width_scale_factor = img_info.width / 256
+            height_scale_factor = img_info.height / 256
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
-                        img_id, _ = os.path.splitext(filename)
+                        # get image id from the filename
+                        rev_filename = ''.join(reversed(img_info.filename))
+                        rev_id_part_filename, _, _ = rev_filename.partition("_")
+                        id_part_filename = ''.join(reversed(rev_id_part_filename))
+                        img_id, _ = os.path.splitext(id_part_filename)
+
                         box = pred[num_categories:, i, j].tolist()
 
-                        # todo (AA): here
                         # todo (AA): use constant output_stride_h = 4.0, output_stride_w = 4.0
-                        # todo (AA): change lines i * 4.0 * 500/256 - box[0], j * 4.0 * 333/256 - box[1],
                         results.append(
                             {
                                 "image_id": int(img_id),
                                 "category_id": category + 1,
                                 "bbox": [
-                                    i * 4.0 * 500/256 - box[0],
-                                    j * 4.0 * 333/256 - box[1],
-                                    box[2] + box[0],
-                                    box[3] + box[1],
+                                    (i * 4.0 - box[0]) * width_scale_factor,
+                                    (j * 4.0 - box[1]) * height_scale_factor,
+                                    (box[2] + box[0]) * width_scale_factor,
+                                    (box[3] + box[1]) * height_scale_factor,
                                 ],
                                 "score": pred[category, i, j].item(),
                             }
@@ -101,39 +105,6 @@ def convert_predictions_to_coco_format(img_filenames, preds, output_path: str = 
             json.dump(results, f)
 
     return results
-
-
-def get_inverse_resize_transformations(
-    num_categories: int,
-    ground_truth_images_info: list[Img_info],
-    transformed_width: int,
-    transformed_height: int,
-):
-    def get_bbox_resizer(num_cat, original_width, original_height):
-        def bbox_resizer(pred):
-            pred[num_cat, :, :] = (
-                pred[num_cat, :, :] * original_width / transformed_width
-            )
-            pred[num_cat + 1, :, :] = (
-                pred[num_cat + 1, :, :] * original_height / transformed_height
-            )
-            pred[num_cat + 2, :, :] = (
-                pred[num_cat + 2, :, :] * original_width / transformed_width
-            )
-            pred[num_cat + 3, :, :] = (
-                pred[num_cat + 3, :, :] * original_height / transformed_height
-            )
-            return pred
-
-        return bbox_resizer
-
-    transformations = []
-    for img_info in ground_truth_images_info:
-        transformations.append(
-            get_bbox_resizer(num_categories, img_info.width, img_info.height)
-        )
-
-    return transformations
 
 
 def transform_dataset(dataset):
@@ -159,19 +130,8 @@ if __name__ == "__main__":
 
     num_categories = predictions[0].shape[0] - 4
 
-    inverse_transfomations = get_inverse_resize_transformations(
-        num_categories,
-        dataset["images_info"],
-        transformed_width=input_width,
-        transformed_height=input_height,
-    )
-
-    resized_predictions = [
-        transform(pred) for transform, pred in zip(inverse_transfomations, predictions)
-    ]
-
-    img_filenames = [elem.file_name for elem in dataset["images_info"]]
+    img_filenames = [elem.filename for elem in dataset["images_info"]]
 
     _ = convert_predictions_to_coco_format(
-        img_filenames, predictions, "../VOC_COCO/pascal_train2007_predictions.json"
+        dataset["images_info"], predictions, "../VOC_COCO/pascal_train2007_predictions.json"
     )
