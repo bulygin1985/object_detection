@@ -9,21 +9,33 @@ Reference 2: https://github.com/yukkyo/voc2coco/blob/master/voc2coco.py
 5. this script doesn't convert segmentation
 
 Example to run:
-python dataset_voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
+python dataset_voc2coco.py /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
 
 or using the default values:
 
-python dataset_voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations
+python dataset_voc2coco.py /path/to/input/voc/Annotations
 """
 
 import argparse
+import logging
 import json
 import os
+import datetime
 from pathlib import Path
 from typing import Dict, List
 
 import defusedxml.ElementTree as ET
 from tqdm import tqdm
+
+
+logging.basicConfig(
+    filename=f"../logs/dataset_voc2coco_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log",
+    format='%(asctime)s,%(msecs)03d %(name)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    level=logging.INFO
+)
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = [".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG"]
 
@@ -85,8 +97,7 @@ def get_ann_files(ann_ids_dir: str) -> Dict:
             with open(ann_ids_path, "r") as f:
                 rows = f.readlines()
                 if not rows:
-                    # todo (AA): log
-                    print(f"Skipping {ann_ids_path}: file is empty")
+                    logger.warning(f"Skipping {ann_ids_path}: file is empty")
                 else:
                     ann_ids = []
                     for r in rows:
@@ -100,8 +111,7 @@ def get_ann_files(ann_ids_dir: str) -> Dict:
                             if int(used) == 1:
                                 ann_ids.append(ann_id)
                         else:
-                            # todo (AA): log error
-                            print(
+                            logger.warning(
                                 f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
                                 f"VOC format!"
                             )
@@ -117,29 +127,32 @@ def get_image_info(annotation_root):
         filename = annotation_root.findtext("filename")
     else:
         filename = os.path.basename(path)
-    img_name = os.path.basename(filename)
+    img_filename = os.path.basename(filename)
 
-    img_id, img_ext = os.path.splitext(img_name)
+    rev_filename = "".join(reversed(img_filename))
+    rev_id_part_filename, _, _ = rev_filename.partition("_")
+    id_part_filename = "".join(reversed(rev_id_part_filename))
+    img_id, img_ext = os.path.splitext(id_part_filename)
+
     if not img_ext in ALLOWED_EXTENSIONS:
-        raise ValueError(f"Image extension is not valid! Got {img_name}")
+        raise ValueError(f"Image extension is not valid! Got {img_filename}")
 
     if not img_id.isdigit():
-        raise ValueError(f"Image file should contain digits only! Got {img_name}")
+        raise ValueError(f"Image file should contain digits only! Got {img_filename}")
 
     size = annotation_root.find("size")
     width = int(size.findtext("width"))
     height = int(size.findtext("height"))
 
     image_info = {
-        "file_name": img_name,
+        "file_name": img_filename,
         "height": height,
         "width": width,
         "id": int(img_id),
     }
     return image_info
 
-
-def get_coco_annotation_from_obj(obj, label2id, min_area):
+def get_coco_annotation_from_obj(obj, ann_file, label2id, min_area):
     label = obj.findtext("name")
     assert label in label2id, f"Error: {label} is not in label2id!"
     category_id = label2id[label]
@@ -154,7 +167,7 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
     o_height = ymax - ymin
     area = o_width * o_height
     if area <= min_area:
-        # todo (AA): log the fact that area < min_area
+        logger.warning(f"area <= min_area, skipping this bounding box. Annotation file: {ann_file}")
         return {}
     ann = {
         "area": area,
@@ -181,17 +194,16 @@ def convert_xmls_to_coco(
         "categories": [],
     }
     bnd_id = 1  # START_BOUNDING_BOX_ID
-    print("Start converting!")
-    for a_file in tqdm(annotation_files):
+    for ann_file in tqdm(annotation_files):
         # Read annotation xml
-        ann_tree = ET.parse(os.path.join(voc_ann_dir, a_file))
+        logger.info(f"Start converting {ann_file}")
+        ann_tree = ET.parse(os.path.join(voc_ann_dir, ann_file))
         ann_root = ann_tree.getroot()
 
         try:
             img_info = get_image_info(annotation_root=ann_root)
         except ValueError as e:
-            # todo (AA): log error
-            print(f"Cannot get image info due to the error: {e}")
+            logger.error(f"Cannot get image info for annotation file '{ann_file}' due to the error: {e}")
             continue
         img_id = img_info["id"]
 
@@ -200,7 +212,7 @@ def convert_xmls_to_coco(
         )
         for obj in ann_root.findall("object"):
             ann = get_coco_annotation_from_obj(
-                obj=obj, label2id=label2id, min_area=min_area
+                ann_file=ann_file, obj=obj, label2id=label2id, min_area=min_area
             )
             if ann:
                 ann.update({"image_id": img_id, "id": bnd_id})
@@ -211,9 +223,9 @@ def convert_xmls_to_coco(
         if valid_image:
             output_json_dict["images"].append(img_info)
         else:
-            # todo (AA): log this message
-            print(
-                f"Image {img_id} is removed since it does not contain any valid object"
+            logger.error(
+                f"Image {img_id} (filename {img_info["file_name"]}) is removed since "
+                f"it does not contain any valid object"
             )
 
     for label, label_id in label2id.items():
@@ -224,7 +236,7 @@ def convert_xmls_to_coco(
         with open(output_jsonpath, "w") as f:
             output_json = json.dumps(output_json_dict)
             f.write(output_json)
-            print(f"The COCO format annotation is saved to {output_jsonpath}")
+            logger.info(f"The COCO format annotation is saved to {output_jsonpath}")
 
     return output_json_dict
 
@@ -264,6 +276,7 @@ def main():
     )
 
     args = parser.parse_args()
+    logger.info(f"Running with args: {args}")
 
     min_area = args.min_area
     assert min_area >= 0
@@ -315,4 +328,10 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    logger.info(f"Started transformation of dataset from VOC to COCO format")
+    try:
+        main()
+    except Exception:
+        logger.exception("Transformation finished with ERROR")
+        raise
+    logger.info(f"Successfully finished transformation of dataset from VOC to COCO format")
