@@ -85,7 +85,8 @@ def convert_predictions_to_coco_format(
             rev_filename = "".join(reversed(img_info.filename))
             rev_id_part_filename, _, _ = rev_filename.partition("_")
             id_part_filename = "".join(reversed(rev_id_part_filename))
-            img_id, _ = os.path.splitext(id_part_filename)
+            img_id_str, _ = os.path.splitext(id_part_filename)
+            img_id = int(img_id_str)
 
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
@@ -93,7 +94,7 @@ def convert_predictions_to_coco_format(
                         box = pred[num_categories:, i, j].tolist()
                         results.append(
                             {
-                                "image_id": int(img_id),
+                                "image_id": img_id,
                                 "category_id": category + 1,
                                 "bbox": [
                                     (j * output_stride_h - box[0]) * width_scale_factor,
