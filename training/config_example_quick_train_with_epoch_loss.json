@@ -32,10 +32,19 @@
     }
   },
   "data": {
-    "image_set": "val",
     "is_download": false,
     "class_amount": 20,
-    "images_folder": "../VOC/VOCdevkit/VOC2007/JPEGImages",
-    "ann_file": "../VOC_COCO/pascal_trainval2007.json"
+    "train": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_train2007.json"
+    },
+    "val": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_val2007.json"
+    },
+    "test": {
+      "images_folder": "../../VOC_test/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_test2007.json"
+    }
   }
 }
