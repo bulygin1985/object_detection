@@ -80,17 +80,17 @@ def convert_predictions_to_coco_format(
         for img_info, pred in zip(imgs_info, preds):
             width_scale_factor = float(img_info.width / IMG_WIDTH)
             height_scale_factor = float(img_info.height / IMG_HEIGHT)
+
+            # get image id from the filename
+            rev_filename = "".join(reversed(img_info.filename))
+            rev_id_part_filename, _, _ = rev_filename.partition("_")
+            id_part_filename = "".join(reversed(rev_id_part_filename))
+            img_id, _ = os.path.splitext(id_part_filename)
+
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
-                        # get image id from the filename
-                        rev_filename = "".join(reversed(img_info.filename))
-                        rev_id_part_filename, _, _ = rev_filename.partition("_")
-                        id_part_filename = "".join(reversed(rev_id_part_filename))
-                        img_id, _ = os.path.splitext(id_part_filename)
-
                         box = pred[num_categories:, i, j].tolist()
-
                         results.append(
                             {
                                 "image_id": int(img_id),
@@ -107,8 +107,8 @@ def convert_predictions_to_coco_format(
                         )
             pbar.update(1)
 
-    print(f"Storing result in file: {output_path}...")
     if output_path is not None:
+        print(f"Storing result in file: {output_path}...")
         with open(output_path, "w") as f:
             json.dump(results, f)
 
