@@ -254,6 +254,7 @@ def train(model_conf, train_conf, data_conf):
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
     save_best_model = train_conf.get("save_best_model", True)
+    skip_save_best_model_epochs = train_conf.get("skip_save_best_model_epochs", 0)
 
     while True:
         epoch_start = time.perf_counter()
@@ -296,7 +297,7 @@ def train(model_conf, train_conf, data_conf):
             )
             if val_loss_history[-1] < best_val_loss:
                 best_val_loss = val_loss_history[-1]
-                if save_best_model:
+                if save_best_model and epoch > skip_save_best_model_epochs:
                     save_model(
                         model,
                         model_conf["weights_path"],
