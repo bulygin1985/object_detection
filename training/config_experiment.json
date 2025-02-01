@@ -13,7 +13,8 @@
         64
       ],
       "head_layers": 3
-    }
+    },
+    "imagenet_normalization": false
   },
   "train": {
     "is_overfit": false,

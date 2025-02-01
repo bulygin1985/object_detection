@@ -1,9 +1,14 @@
 import torch.nn as nn
+import torchvision.transforms.functional as F
 
 from losses.centernet_ttf import CenternetTTFLoss
 from models.backbones import create_backbone
 from models.centernet_head import Head
 from utils.config import IMG_HEIGHT, IMG_WIDTH
+from typing import Tuple
+
+imagenent_mean: Tuple[float, ...] = (0.485, 0.456, 0.406)
+imagenent_std: Tuple[float, ...] = (0.229, 0.224, 0.225)
 
 
 class ModelBuilder(nn.Module):
@@ -18,6 +23,7 @@ class ModelBuilder(nn.Module):
         class_number=20,
         backbone: str = "default",
         backbone_weights: str = None,
+        imagenet_normalization: bool = False,
     ):
         super().__init__()
         self.class_number = class_number
@@ -38,9 +44,16 @@ class ModelBuilder(nn.Module):
             IMG_HEIGHT // 4,
             IMG_WIDTH // 4,
         )
+        self.imagenet_normalization = imagenet_normalization
+
+    def normalize(self, x):
+        if self.imagenet_normalization:
+            return F.normalize(x, imagenent_mean, imagenent_std)
+        else:
+            return x / 0.5 - 1.0  # normalization
 
     def forward(self, x, gt=None):
-        x = x / 0.5 - 1.0  # normalization
+        x = self.normalize(x)
         out = self.backbone(x)
         pred = self.head(*out)
 

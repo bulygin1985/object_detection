@@ -183,6 +183,7 @@ def train(model_conf, train_conf, data_conf):
         alpha=model_conf["alpha"],
         backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
+        imagenet_normalization=model_conf.get("imagenet_normalization", False),
     ).to(device)
 
     lr = train_conf["lr"]
