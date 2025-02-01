@@ -13,7 +13,7 @@ class ModelBuilder(nn.Module):
 
     def __init__(
         self,
-        filters_size: list=None,
+        filters_size: list = None,
         alpha=1.0,
         class_number=20,
         backbone: str = "default",
