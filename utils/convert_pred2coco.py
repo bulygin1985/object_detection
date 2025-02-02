@@ -130,7 +130,7 @@ def transform_dataset(dataset):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = load_model(device, ModelBuilder)
+    model = load_model(device, ModelBuilder, alpha=0.25)
 
     dataset = prepare_dataset()
     dataset_transformed = transform_dataset(dataset["annotations"])
