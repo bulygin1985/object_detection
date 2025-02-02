@@ -1,7 +1,7 @@
 """
-Convert VOC format predictions to COCO.
+Convert predictions to COCO format.
 Example to run:
-python predictions_voc2coco.py
+python convert_pred2coco.py
 """
 
 import json
