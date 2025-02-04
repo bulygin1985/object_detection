@@ -108,8 +108,8 @@ class CenternetEncoder:
                 if self._coords_scaled or self._coords_relative:
                     bbox = bbox.copy()
                     if self._coords_relative:
-                        x_center_cell = (center_int[0] + 0.5) * self._down_ratio
-                        y_center_cell = (center_int[1] + 0.5) * self._down_ratio
+                        x_center_cell = (center[0] + 0.5) * self._down_ratio
+                        y_center_cell = (center[1] + 0.5) * self._down_ratio
                         bbox[0] = x_center_cell - bbox[0]
                         bbox[2] = bbox[2] - x_center_cell
                         bbox[1] = y_center_cell - bbox[1]
