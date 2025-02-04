@@ -4,6 +4,7 @@ import torchvision.transforms.v2 as transforms
 
 def get_predictions(device, model, dataset):
     """Get model predictions for the given dataset"""
+    model.eval()
     transform = transforms.Compose(
         [
             transforms.ToImage(),
