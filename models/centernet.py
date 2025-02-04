@@ -25,6 +25,7 @@ class ModelBuilder(nn.Module):
         backbone: str = "default",
         backbone_weights: str = None,
         imagenet_normalization: bool = False,
+        ground_truth_bbox_encoding="absolute",
     ):
         super().__init__()
         self.class_number = class_number
@@ -44,6 +45,7 @@ class ModelBuilder(nn.Module):
             4,
             IMG_HEIGHT // 4,
             IMG_WIDTH // 4,
+            ground_truth_bbox_encoding=ground_truth_bbox_encoding,
         )
         self.imagenet_normalization = imagenet_normalization
 
