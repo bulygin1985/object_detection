@@ -152,12 +152,6 @@ class MAPEvaluator:
 
 
 if __name__ == "__main__":
-    v2_transforms = v2_transforms.Compose(
-        [
-            v2_transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT)),
-        ]
-    )
-
     evaluator = MAPEvaluator(
         ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
         model_predictions="../VOC_COCO/pascal_train2007_predictions.json",
