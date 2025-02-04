@@ -6,9 +6,11 @@ python convert_pred2coco.py "../VOC/VOCdevkit/VOC2007/JPEGImages" \
     --output_file="../VOC_COCO/pascal_train2007_predictions.json" \
     --imgs_ids="12, 17, 23, 26, 32, 33, 34, 35, 36, 42"
 """
+
 import argparse
 import json
 from collections import namedtuple
+from typing import Any
 
 import torch
 from load_model import load_model
@@ -16,12 +18,10 @@ from predictions import get_predictions
 from torch.utils.data import Subset
 from torchvision.transforms import v2 as transforms
 from tqdm import tqdm
-from typing import Any
 
 from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
-
 
 BBOX_PART_LEN = 4
 IMG_HEIGHT = IMG_WIDTH = 256
@@ -32,12 +32,20 @@ def prepare_dataset(imgs_dir: str, ann_file: str, imgs_ids: list[int] = None):
     ds_loader = MSCOCODatasetLoader(imgs_dir, ann_file)
 
     dataset = ds_loader.get_dataset()
-    imgs_info = dataset.coco.dataset['images']
+    imgs_info = dataset.coco.dataset["images"]
 
     dataset = sorted(dataset, key=lambda x: int(x[1]["image_id"]))
     imgs_info = sorted(imgs_info, key=lambda x: int(x["id"]))
 
-    subset = {i: img_info for i, img_info in enumerate(imgs_info) if img_info["id"] in imgs_ids} if imgs_ids else {}
+    subset = (
+        {
+            i: img_info
+            for i, img_info in enumerate(imgs_info)
+            if img_info["id"] in imgs_ids
+        }
+        if imgs_ids
+        else {}
+    )
     imgs_info_subset = list(subset.values()) if imgs_ids else imgs_info
     indices = list(subset.keys())
 
@@ -119,21 +127,25 @@ if __name__ == "__main__":
         description="This script converts predictions to coco format json"
     )
 
-    parser.add_argument(
-        "imgs_dir", type=str, help="path to images"
-    )
+    parser.add_argument("imgs_dir", type=str, help="path to images")
 
     parser.add_argument(
         "ann_file", type=str, help="path to json-file with annotation in COCO format"
     )
 
     parser.add_argument(
-        "--imgs_ids", type=str, default="", help="list of images ids to get predictions; "
-                                                "should be passed in form 1,2,3,4,5"
+        "--imgs_ids",
+        type=str,
+        default="",
+        help="list of images ids to get predictions; "
+        "should be passed in form 1,2,3,4,5",
     )
 
     parser.add_argument(
-        "--output_file", type=str, default="", help="output file to store converted predictions"
+        "--output_file",
+        type=str,
+        default="",
+        help="output file to store converted predictions",
     )
 
     args = parser.parse_args()
