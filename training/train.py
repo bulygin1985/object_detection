@@ -152,10 +152,11 @@ def train(model_conf, train_conf, data_conf):
     val_transform = compose_transforms()
 
     model_head_conf = model_conf["head"]
+    bbox_encode_relative = model_head_conf.get("bbox_encode_relative")
     encoder = CenternetEncoder(
         IMG_HEIGHT,
         IMG_WIDTH,
-        coords_relative=model_head_conf.get("bbox_encode_relative"),
+        coords_relative=bbox_encode_relative,
         coords_scaled=model_head_conf.get("bbox_encode_scaled"),
     )
 
@@ -190,6 +191,7 @@ def train(model_conf, train_conf, data_conf):
         backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
         imagenet_normalization=model_conf.get("imagenet_normalization", False),
+        ground_truth_bbox_encoding="relative" if bbox_encode_relative else "absolute",
     ).to(device)
 
     lr = train_conf["lr"]

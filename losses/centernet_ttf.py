@@ -5,7 +5,15 @@ import torch.nn as nn
 
 
 class CenternetTTFLoss(nn.Module):
-    def __init__(self, class_num, down_ratio, out_height, out_width, loss_dict={}):
+    def __init__(
+        self,
+        class_num,
+        down_ratio,
+        out_height,
+        out_width,
+        loss_dict={},
+        ground_truth_bbox_encoding="absolute",
+    ):
         super().__init__()
 
         cols = torch.arange(out_width)
@@ -20,11 +28,16 @@ class CenternetTTFLoss(nn.Module):
         self._cols = cols
         self._rows = rows
 
-        self._down_ratio = 4
+        self._down_ratio = down_ratio
 
         self.loss_dict = loss_dict
         if self.loss_dict == None:
             self.loss_dict = {}
+        assert (
+            ground_truth_bbox_encoding == "absolute"
+            or ground_truth_bbox_encoding == "relative"
+        )
+        self.ground_truth_bbox_as_offsets = ground_truth_bbox_encoding == "relative"
 
         self._class_num = class_num
 
@@ -103,12 +116,13 @@ class CenternetTTFLoss(nn.Module):
         """
 
         mask = torch.gt(y_true, 0.0).float()
-        res = self.get_box_coors(y_pred)
         num_pos = mask.sum()
-
         if torch.eq(num_pos, 0):
             return 0.0
 
+        res = (
+            y_pred if self.ground_truth_bbox_as_offsets else self.get_box_coors(y_pred)
+        )
         loss = torch.abs(res - y_true) * mask
 
         loss = loss.sum() / num_pos
