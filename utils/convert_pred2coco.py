@@ -9,7 +9,6 @@ python convert_pred2coco.py "../VOC/VOCdevkit/VOC2007/JPEGImages" \
 
 import argparse
 import json
-from collections import namedtuple
 from typing import Any
 
 import torch
