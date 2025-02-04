@@ -56,11 +56,42 @@ def prepare_dataset(imgs_dir: str, ann_file: str, imgs_ids: list[int] = None):
 
 def convert_predictions_to_coco_format(
     imgs_info: list[dict[str, Any]],
-    preds,
+    preds: list[torch.Tensor],
     output_stride_h: int = 4,
     output_stride_w: int = 4,
     output_file: str = None,
 ) -> list[dict[str, object]]:
+    """
+    Converts model predictions into COCO format.
+
+    This function processes a list of predicted tensors and image metadata, converting
+    the predictions into a COCO-compatible format. Each prediction includes the image ID,
+    category ID, bounding box coordinates, and confidence score.
+
+    Args:
+        imgs_info (list[dict[str, Any]]): A list of dictionaries containing image metadata,
+            including image width, height, and ID.
+        preds (list[torch.Tensor]): A list of tensors representing model predictions. Each tensor
+            has a shape of (num_categories + 4, H, W), where the last 4 channels represent the bounding box.
+        output_stride_h (int, optional): The stride of the output feature map in height. Defaults to 4.
+        output_stride_w (int, optional): The stride of the output feature map in width. Defaults to 4.
+        output_file (str, optional): Path to save the results as a JSON file. If None, the results
+            are not saved to a file. Defaults to None.
+
+    Returns:
+        list[dict[str, object]]: A list of dictionaries formatted according to COCO annotation format.
+            Each dictionary contains:
+            - "image_id" (int): The ID of the corresponding image.
+            - "category_id" (int): The ID of the detected category.
+            - "bbox" (list[float]): The bounding box in COCO format [x, y, width, height].
+            - "score" (float): The confidence score of the prediction.
+
+    Notes:
+        - The function rescales bounding boxes based on the original image dimensions.
+        - It uses a progress bar (via `tqdm`) to track processing progress.
+        - If `output_file` is provided, the results are saved as a JSON file.
+
+    """
     # [{
     #     "image_id": int,
     #     "category_id": int,
