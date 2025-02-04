@@ -12,9 +12,11 @@
         128,
         64
       ],
-      "head_layers": 3
+      "head_layers": 3,
+      "bbox_encode_relative": true,
+      "bbox_encode_scaled": true
     },
-    "imagenet_normalization": false
+    "imagenet_normalization": false    
   },
   "train": {
     "is_overfit": false,

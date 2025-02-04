@@ -151,7 +151,13 @@ def train(model_conf, train_conf, data_conf):
     train_transform = compose_transforms(train_conf.get("data_augmentation"))
     val_transform = compose_transforms()
 
-    encoder = CenternetEncoder(IMG_HEIGHT, IMG_WIDTH)
+    model_head_conf = model_conf["head"]
+    encoder = CenternetEncoder(
+        IMG_HEIGHT,
+        IMG_WIDTH,
+        coords_relative=model_head_conf.get("bbox_encode_relative"),
+        coords_scaled=model_head_conf.get("bbox_encode_scaled"),
+    )
 
     dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_val)
     dataset_train = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset_train)

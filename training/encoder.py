@@ -56,22 +56,37 @@ def draw_gaussian(heatmap, center, radius_x, radius_y):
 
 
 class CenternetEncoder:
-    def __init__(self, img_height=320, img_width=320, down_ratio=4, n_classes=20):
+    def __init__(
+        self,
+        img_height=320,
+        img_width=320,
+        down_ratio=4,
+        n_classes=20,
+        coords_relative: bool = False,
+        coords_scaled: bool = False,
+    ):
+        """
+        Args:
+            coords_relative: when True encode bbox edges(l,t,b,r) relative to the center of bb center cell.
+            coords_scaled: when True encode bbox edges(l,t,b,r) divided by image dimension
+        """
         self._img_height = img_height
         self._img_width = img_width
         self._out_height = self._img_height // down_ratio
         self._out_width = self._img_width // down_ratio
         self._n_classes = n_classes
         self._down_ratio = down_ratio
+        self._coords_relative = coords_relative
+        self._coords_scaled = coords_scaled
         print("down_ratio = {}".format(self._down_ratio))
 
     def __call__(self, bboxes, labels):
-
         hm = np.zeros(
             (self._out_height, self._out_width, self._n_classes), dtype=np.float32
         )
         coors = np.zeros((self._out_height, self._out_width, 4), dtype=np.float32)
         for cls_id, bbox in zip(labels.data.numpy(), bboxes.data.numpy()):
+            # print(bbox)
             box_s = bbox / self._down_ratio
             h, w = box_s[3] - box_s[1], box_s[2] - box_s[0]
             rad_w_class = int(np.round(gaussian_radius([h, w])))
@@ -81,11 +96,28 @@ class CenternetEncoder:
                     [(box_s[0] + box_s[2]) / 2, (box_s[1] + box_s[3]) / 2],
                     dtype=np.float32,
                 )
-                center = np.round(center)
+                if self._coords_relative:
+                    center = np.floor(center)
+                else:
+                    center = np.round(center)
                 center = np.clip(
                     center, [0, 0], [self._out_width - 1, self._out_height - 1]
                 )
                 center_int = center.astype(np.int32)
                 draw_gaussian(hm[..., cls_id - 1], center_int, rad_w_class, rad_h_class)
+                if self._coords_scaled or self._coords_relative:
+                    bbox = bbox.copy()
+                    if self._coords_relative:
+                        x_center_cell = (center_int[0] + 0.5) * self._down_ratio
+                        y_center_cell = (center_int[1] + 0.5) * self._down_ratio
+                        bbox[0] = x_center_cell - bbox[0]
+                        bbox[2] = bbox[2] - x_center_cell
+                        bbox[1] = y_center_cell - bbox[1]
+                        bbox[3] = bbox[3] - y_center_cell
+                    if self._coords_scaled:
+                        bbox[0] /= self._img_width
+                        bbox[2] /= self._img_width
+                        bbox[1] /= self._img_height
+                        bbox[3] /= self._img_height
                 coors[center_int[1], center_int[0]] = bbox
         return np.concatenate((hm, coors), axis=-1)

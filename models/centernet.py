@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import torch.nn as nn
 import torchvision.transforms.functional as F
 
@@ -5,7 +7,6 @@ from losses.centernet_ttf import CenternetTTFLoss
 from models.backbones import create_backbone
 from models.centernet_head import Head
 from utils.config import IMG_HEIGHT, IMG_WIDTH
-from typing import Tuple
 
 imagenent_mean: Tuple[float, ...] = (0.485, 0.456, 0.406)
 imagenent_std: Tuple[float, ...] = (0.229, 0.224, 0.225)
