@@ -1,66 +1,54 @@
 """
 Convert predictions to COCO format.
 Example to run:
-python convert_pred2coco.py
+python convert_pred2coco.py "../VOC/VOCdevkit/VOC2007/JPEGImages" \
+    "../VOC_COCO/pascal_trainval2007.json" \
+    --output_file="../VOC_COCO/pascal_train2007_predictions.json" \
+    --imgs_ids="12, 17, 23, 26, 32, 33, 34, 35, 36, 42"
 """
-
+import argparse
 import json
-import os
 from collections import namedtuple
 
 import torch
-import torchvision
 from load_model import load_model
 from predictions import get_predictions
 from torch.utils.data import Subset
 from torchvision.transforms import v2 as transforms
 from tqdm import tqdm
+from typing import Any
 
 from data.dataset import Dataset
+from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
 
+
+BBOX_PART_LEN = 4
 IMG_HEIGHT = IMG_WIDTH = 256
 
-Img_info = namedtuple("Img_info", ["id", "filename", "height", "width"])
 
+def prepare_dataset(imgs_dir: str, ann_file: str, imgs_ids: list[int] = None):
+    # Load COCO dataset
+    ds_loader = MSCOCODatasetLoader(imgs_dir, ann_file)
+    dataset = ds_loader.get_dataset()
+    imgs_info = dataset.coco.dataset['images']
 
-def prepare_dataset():
-    # Load VOC dataset
-    dataset = torchvision.datasets.VOCDetection(
-        root="../VOC", year="2007", image_set="train", download=False
-    )
-
-    dataset_val = torchvision.datasets.wrap_dataset_for_transforms_v2(dataset)
+    subset = {i: img_info for i, img_info in enumerate(imgs_info) if img_info["id"] in imgs_ids} if imgs_ids else {}
+    imgs_info_subset = list(subset.values()) if imgs_ids else imgs_info
+    indices = list(subset.keys())
 
     # Define a dataset that is a subset of the initial dataset
-    indices = range(10)
-    dataset_val = Subset(dataset_val, indices)
+    dataset_subset = Subset(dataset, indices) if imgs_ids else dataset
 
-    imgs_info = []
-    for i in indices:
-        ann = dataset[i][1]["annotation"]
-        filename = ann["filename"]
-        id_str, _ = os.path.splitext(filename)
-        imgs_info.append(
-            Img_info(
-                id=int(id_str),
-                filename=filename,
-                height=int(ann["size"]["height"]),
-                width=int(ann["size"]["width"]),
-            )
-        )
-    # the same can be achieved much easier if dataset is a CocoDetection dataset:
-    # img_info = dataset.coco.dataset['images']
-
-    return {"images_info": imgs_info, "annotations": dataset_val}
+    return {"images_info": imgs_info_subset, "annotations": dataset_subset}
 
 
 def convert_predictions_to_coco_format(
-    imgs_info: list[Img_info],
+    imgs_info: list[dict[str, Any]],
     preds,
     output_stride_h: int = 4,
     output_stride_w: int = 4,
-    output_path: str = None,
+    output_file: str = None,
 ) -> list[dict[str, object]]:
     # [{
     #     "image_id": int,
@@ -78,15 +66,8 @@ def convert_predictions_to_coco_format(
 
     with tqdm(total=total) as pbar:
         for img_info, pred in zip(imgs_info, preds):
-            width_scale_factor = float(img_info.width / IMG_WIDTH)
-            height_scale_factor = float(img_info.height / IMG_HEIGHT)
-
-            # get image id from the filename
-            rev_filename = "".join(reversed(img_info.filename))
-            rev_id_part_filename, _, _ = rev_filename.partition("_")
-            id_part_filename = "".join(reversed(rev_id_part_filename))
-            img_id_str, _ = os.path.splitext(id_part_filename)
-            img_id = int(img_id_str)
+            width_scale_factor = float(img_info["width"] / IMG_WIDTH)
+            height_scale_factor = float(img_info["height"] / IMG_HEIGHT)
 
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
@@ -94,7 +75,7 @@ def convert_predictions_to_coco_format(
                         box = pred[num_categories:, i, j].tolist()
                         results.append(
                             {
-                                "image_id": img_id,
+                                "image_id": img_info["id"],
                                 "category_id": category + 1,
                                 "bbox": [
                                     (j * output_stride_h - box[0]) * width_scale_factor,
@@ -108,9 +89,9 @@ def convert_predictions_to_coco_format(
                         )
             pbar.update(1)
 
-    if output_path is not None:
-        print(f"Storing result in file: {output_path}...")
-        with open(output_path, "w") as f:
+    if output_file:
+        print(f"Storing result in file: {output_file}...")
+        with open(output_file, "w") as f:
             json.dump(results, f)
 
     return results
@@ -130,19 +111,47 @@ def transform_dataset(dataset):
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    parser = argparse.ArgumentParser(
+        description="This script converts predictions to coco format json"
+    )
+
+    parser.add_argument(
+        "imgs_dir", type=str, help="path to images"
+    )
+
+    parser.add_argument(
+        "ann_file", type=str, help="path to json-file with annotation in COCO format"
+    )
+
+    parser.add_argument(
+        "--imgs_ids", type=str, default="", help="list of images ids to get predictions; "
+                                                "should be passed in form 1,2,3,4,5"
+    )
+
+    parser.add_argument(
+        "--output_file", type=str, default="", help="output file to store converted predictions"
+    )
+
+    args = parser.parse_args()
+
+    imgs_ids = args.imgs_ids.split(",")
+    imgs_ids_int = list(map(int, imgs_ids))
+
     model = load_model(device, ModelBuilder, alpha=0.25)
 
-    dataset = prepare_dataset()
+    dataset = prepare_dataset(
+        imgs_dir=args.imgs_dir,
+        ann_file=args.ann_file,
+        imgs_ids=imgs_ids_int,
+    )
     dataset_transformed = transform_dataset(dataset["annotations"])
     predictions = get_predictions(device, model, dataset_transformed)
     predictions = [pred.squeeze() for pred in predictions]
 
-    num_categories = predictions[0].shape[0] - 4
-
-    img_filenames = [elem.filename for elem in dataset["images_info"]]
+    num_categories = predictions[0].shape[0] - BBOX_PART_LEN
 
     _ = convert_predictions_to_coco_format(
         dataset["images_info"],
         predictions,
-        output_path="../VOC_COCO/pascal_train2007_predictions.json",
+        output_file=args.output_file or None,
     )
