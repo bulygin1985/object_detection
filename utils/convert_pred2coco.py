@@ -30,8 +30,12 @@ IMG_HEIGHT = IMG_WIDTH = 256
 def prepare_dataset(imgs_dir: str, ann_file: str, imgs_ids: list[int] = None):
     # Load COCO dataset
     ds_loader = MSCOCODatasetLoader(imgs_dir, ann_file)
+
     dataset = ds_loader.get_dataset()
     imgs_info = dataset.coco.dataset['images']
+
+    dataset = sorted(dataset, key=lambda x: int(x[1]["image_id"]))
+    imgs_info = sorted(imgs_info, key=lambda x: int(x["id"]))
 
     subset = {i: img_info for i, img_info in enumerate(imgs_info) if img_info["id"] in imgs_ids} if imgs_ids else {}
     imgs_info_subset = list(subset.values()) if imgs_ids else imgs_info
