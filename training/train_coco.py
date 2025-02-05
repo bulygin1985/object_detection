@@ -164,7 +164,7 @@ def train(run_folder, model_conf, train_conf, data_conf):
     best_val_loss = float("inf")
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
-    save_best_model = train_conf.get("save_best_model", True)
+    save_best_model = train_conf.get("save_best_model", False)
     save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
 
     while True:
