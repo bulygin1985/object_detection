@@ -199,7 +199,7 @@ def train(run_folder, model_conf, train_conf, data_conf):
             train_loss_history.append(train_validation_loss)
             val_loss_history.append(val_validation_loss)
             if val_validation_loss < best_val_loss:
-                best_val_loss = val_loss_history[-1]
+                best_val_loss = val_validation_loss
                 if save_best_model and epoch > save_best_model_skip_epochs:
                     save_model(
                         model,
