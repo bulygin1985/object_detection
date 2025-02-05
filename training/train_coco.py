@@ -37,14 +37,6 @@ def log_stats(tensorboard_writer, epoch, lr, losses: dict):
     tensorboard_writer.add_scalar("Val/loss", val_validation_loss, epoch)
     tensorboard_writer.add_scalar("Train/lr", lr, epoch)
 
-    # Verbose
-    print(
-        (
-            f"Epoch {epoch} train loss = {train_validation_loss}, "
-            f"val loss = {val_validation_loss}"
-        )
-    )
-
 
 def save_model(model, weights_path: str = None, **kwargs):
     checkpoints_dir = weights_path or "models/checkpoints"
@@ -136,11 +128,12 @@ def train(run_folder, model_conf, train_conf, data_conf):
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
 
+    backbone_name = model_conf["backbone"]["name"]
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
         class_number=data_conf.get("class_amount"),
-        backbone=model_conf["backbone"]["name"],
+        backbone=backbone_name,
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
@@ -167,8 +160,12 @@ def train(run_folder, model_conf, train_conf, data_conf):
 
     train_loss_history = []
     val_loss_history = []
+    best_val_loss_history = []
+    best_val_loss = float("inf")
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
+    save_best_model = train_conf.get("save_best_model", True)
+    save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
 
     while True:
         loss_dict = {}
@@ -199,6 +196,16 @@ def train(run_folder, model_conf, train_conf, data_conf):
             )
             train_loss_history.append(train_validation_loss)
             val_loss_history.append(val_validation_loss)
+            if val_validation_loss < best_val_loss:
+                best_val_loss = val_loss_history[-1]
+                if save_best_model and epoch > save_best_model_skip_epochs:
+                    save_model(
+                        model,
+                        run_folder,
+                        tag=tag + "_best",
+                        backbone=backbone_name,
+                    )
+            best_val_loss_history.append(best_val_loss)
 
             loss_stats = {
                 "validation": {
@@ -207,6 +214,13 @@ def train(run_folder, model_conf, train_conf, data_conf):
                 }
             }
             log_stats(writer, epoch, last_lr, loss_stats)
+            print(
+                (
+                    f"Epoch {epoch} train loss = {train_validation_loss:.5f}, "
+                    f"val loss = {val_validation_loss:.5f}, "
+                    f"best val loss = {best_val_loss:.5f}, "
+                )
+            )
 
         print("= = = = = = = = = =")
         if criteria_satisfied(loss, epoch):
@@ -223,7 +237,7 @@ def train(run_folder, model_conf, train_conf, data_conf):
         model,
         run_folder,
         tag=tag,
-        backbone=model_conf["backbone"]["name"],
+        backbone=backbone_name,
     )
 
     if model_conf["weights_path"]:
@@ -231,13 +245,14 @@ def train(run_folder, model_conf, train_conf, data_conf):
             model,
             model_conf["weights_path"],
             tag=tag,
-            backbone=model_conf["backbone"]["name"],
+            backbone=backbone_name,
         )
 
     loss_df = pd.DataFrame(
         {
             "train_loss": train_loss_history,
             "val_loss": val_loss_history,
+            "best_val_loss": best_val_loss_history,
         }
     )
     loss_df.to_csv(os.path.join(run_folder, "losses.csv"))
