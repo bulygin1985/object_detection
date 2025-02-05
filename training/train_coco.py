@@ -75,7 +75,13 @@ def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     return loss / count
 
 
-def train(run_folder, model_conf, train_conf, data_conf):
+def train(filepath):
+    model_conf, train_conf, data_conf = load_config(filepath)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_folder = f"runs/training_{timestamp}"
+    os.makedirs(run_folder)
+    shutil.copy(filepath, run_folder)
+
     writer = SummaryWriter(run_folder)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
@@ -263,22 +269,13 @@ def train(run_folder, model_conf, train_conf, data_conf):
     loss_df.to_csv(os.path.join(run_folder, "losses.csv"))
 
 
-def train_with_config(filepath):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_folder = f"runs/training_{timestamp}"
-    model_conf, train_conf, data_conf = load_config(filepath)
-    os.makedirs(run_folder)
-    shutil.copy(filepath, run_folder)
-    train(run_folder, model_conf, train_conf, data_conf)
-
-
 def main(config_path: str = None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", type=str, help="path to config file")
     args = parser.parse_args()
 
     filepath = args.config or config_path
-    train_with_config(filepath)
+    train(filepath)
 
 
 if __name__ == "__main__":
