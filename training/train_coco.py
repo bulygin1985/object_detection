@@ -1,4 +1,5 @@
 import argparse
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -36,14 +37,12 @@ def log_stats(tensorboard_writer, epoch, lr, losses: dict):
     tensorboard_writer.add_scalar("Train/lr", lr, epoch)
 
     # Verbose
-    print("= = = = = = = = = =")
     print(
         (
-            f"Epoch {epoch} train loss = {train_validation_loss},"
+            f"Epoch {epoch} train loss = {train_validation_loss}, "
             f"val loss = {val_validation_loss}"
         )
     )
-    print("= = = = = = = = = =")
 
 
 def save_model(model, weights_path: str = None, **kwargs):
@@ -82,21 +81,8 @@ def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     return loss / count
 
 
-def main(config_path: str = None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, help="path to config file")
-    args = parser.parse_args()
-
-    filepath = args.config or config_path
-
-    model_conf, train_conf, data_conf = load_config(filepath)
-
-    train(model_conf, train_conf, data_conf)
-
-
-def train(model_conf, train_conf, data_conf):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    writer = SummaryWriter(f"runs/training_{timestamp}")
+def train(run_folder, model_conf, train_conf, data_conf):
+    writer = SummaryWriter(run_folder)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
@@ -201,6 +187,7 @@ def train(model_conf, train_conf, data_conf):
             curr_lr = scheduler.get_last_lr()[0]
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
+        print("= = = = = = = = = =")
         if calculate_epoch_loss:
             last_lr = scheduler.get_last_lr()[0]
             train_validation_loss = calculate_validation_loss(
@@ -220,6 +207,7 @@ def train(model_conf, train_conf, data_conf):
             }
             log_stats(writer, epoch, last_lr, loss_stats)
 
+        print("= = = = = = = = = =")
         if criteria_satisfied(loss, epoch):
             break
 
@@ -243,7 +231,24 @@ def train(model_conf, train_conf, data_conf):
             "val_loss": val_loss_history,
         }
     )
-    loss_df.to_csv(f"losses_{timestamp}.csv")
+    loss_df.to_csv(os.path.join(run_folder, "losses.csv"))
+
+
+def train_with_config(filepath):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_folder = f"runs/training_{timestamp}"
+
+    model_conf, train_conf, data_conf = load_config(filepath)
+    train(run_folder, model_conf, train_conf, data_conf)
+
+
+def main(config_path: str = None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", type=str, help="path to config file")
+    args = parser.parse_args()
+
+    filepath = args.config or config_path
+    train_with_config(filepath)
 
 
 if __name__ == "__main__":
