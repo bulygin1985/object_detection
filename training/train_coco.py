@@ -1,6 +1,7 @@
 import argparse
 import os
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -168,6 +169,7 @@ def train(run_folder, model_conf, train_conf, data_conf):
     save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
 
     while True:
+        epoch_start = time.perf_counter()
         loss_dict = {}
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
@@ -216,12 +218,15 @@ def train(run_folder, model_conf, train_conf, data_conf):
             log_stats(writer, epoch, last_lr, loss_stats)
             print(
                 (
-                    f"Epoch {epoch} train loss = {train_validation_loss:.5f}, "
-                    f"val loss = {val_validation_loss:.5f}, "
-                    f"best val loss = {best_val_loss:.5f}, "
+                    f"Epoch {epoch} train loss = {train_validation_loss:.4f}, "
+                    f"val loss = {val_validation_loss:.4f}, "
+                    f"best val loss = {best_val_loss:.4f}"
                 )
             )
 
+        print(
+            f"Epoch calculation time is {time.perf_counter()-epoch_start:.2f} seconds"
+        )
         print("= = = = = = = = = =")
         if criteria_satisfied(loss, epoch):
             break
