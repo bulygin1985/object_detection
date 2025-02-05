@@ -14,7 +14,7 @@
       ],
       "head_layers": 3,
       "bbox_encode_relative": true,
-      "bbox_encode_scaled": true
+      "bbox_encode_scaled": false
     },
     "imagenet_normalization": false    
   },
