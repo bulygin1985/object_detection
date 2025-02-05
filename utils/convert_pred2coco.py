@@ -176,7 +176,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_weights",
         type=str,
-        default="",
         help="Model weights file",
     )
 
