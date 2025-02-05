@@ -124,7 +124,8 @@ def convert_predictions_to_coco_format(
                                     "image_id": img_info["id"],
                                     "category_id": category + 1,
                                     "bbox": [
-                                        (j * output_stride_h - box[0]) * width_scale_factor,
+                                        (j * output_stride_h - box[0])
+                                        * width_scale_factor,
                                         (i * output_stride_w - box[1])
                                         * height_scale_factor,
                                         (box[2] + box[0]) * width_scale_factor,
@@ -132,7 +133,7 @@ def convert_predictions_to_coco_format(
                                     ],
                                     "score": score,
                                 }
-                        )
+                            )
             pbar.update(1)
 
     if output_file:
@@ -210,6 +211,6 @@ if __name__ == "__main__":
     _ = convert_predictions_to_coco_format(
         dataset["images_info"],
         predictions,
-        threshold = args.threshold,
+        threshold=args.threshold,
         output_file=args.output_file or None,
     )
