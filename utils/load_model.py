@@ -3,11 +3,38 @@ from typing import Type
 
 import torch
 import torch.nn as nn
+from config import load_config
+
+from models.centernet import ModelBuilder
+
+
+def create_model(
+    model_conf: dict, data_conf: dict, device: torch.device, load_weights: bool = True
+):
+    model = ModelBuilder(
+        filters_size=model_conf["head"]["filters_size"],
+        alpha=model_conf["alpha"],
+        class_number=data_conf.get("class_amount"),
+        backbone=model_conf["backbone"]["name"],
+        backbone_weights=(
+            model_conf["backbone"]["pretrained_weights"] if load_weights else None
+        ),
+    )
+    return model.to(device)
+
+
+def create_model_from_config_file(
+    config_filepath: str, device: torch.device, load_weights: bool = True
+):
+    """Creates a model given config."""
+    model_conf, _, data_conf = load_config(config_filepath)
+    return create_model(model_conf, data_conf, device, load_weights)
 
 
 def load_model(
     device: torch.device,
     model_type: Type[nn.Module],
+    config_filepath: str = None,
     checkpoint_path: str = None,
     **kwargs,
 ) -> nn.Module:
@@ -35,7 +62,10 @@ def load_model(
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
 
-    model = model_type(filters_size=[128, 64, 32], **kwargs).to(device)
+    if config_filepath:
+        model = create_model_from_config_file(config_filepath, device, False)
+    else:
+        model = model_type(filters_size=[128, 64, 32], **kwargs).to(device)
     model.load_state_dict(
         torch.load(
             checkpoint_path,

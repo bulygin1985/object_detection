@@ -171,6 +171,15 @@ if __name__ == "__main__":
         "should be passed in form 1,2,3,4,5",
     )
 
+    parser.add_argument("-c", "--config", type=str, help="path to config file")
+
+    parser.add_argument(
+        "--model_weights",
+        type=str,
+        default="",
+        help="Model weights file",
+    )
+
     parser.add_argument(
         "--output_file",
         type=str,
@@ -183,7 +192,13 @@ if __name__ == "__main__":
     imgs_ids = args.imgs_ids.split(",")
     imgs_ids_int = list(map(int, imgs_ids))
 
-    model = load_model(device, ModelBuilder, alpha=0.25)
+    model = load_model(
+        device,
+        ModelBuilder,
+        config_filepath=args.config,
+        checkpoint_path=args.model_weights,
+        alpha=0.25,
+    )
 
     dataset = prepare_dataset(
         imgs_dir=args.imgs_dir,
