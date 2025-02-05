@@ -75,12 +75,12 @@ def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     return loss / count
 
 
-def train(filepath):
-    model_conf, train_conf, data_conf = load_config(filepath)
+def train(config_filepath):
+    model_conf, train_conf, data_conf = load_config(config_filepath)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_folder = f"runs/training_{timestamp}"
     os.makedirs(run_folder)
-    shutil.copy(filepath, run_folder)
+    shutil.copy(config_filepath, run_folder)
 
     writer = SummaryWriter(run_folder)
 
