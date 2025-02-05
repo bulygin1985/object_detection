@@ -57,6 +57,7 @@ def prepare_dataset(imgs_dir: str, ann_file: str, imgs_ids: list[int] = None):
 def convert_predictions_to_coco_format(
     imgs_info: list[dict[str, Any]],
     preds: list[torch.Tensor],
+    threshold: float = 0.0,
     output_stride_h: int = 4,
     output_stride_w: int = 4,
     output_file: str = None,
@@ -73,6 +74,7 @@ def convert_predictions_to_coco_format(
             including image width, height, and ID.
         preds (list[torch.Tensor]): A list of tensors representing model predictions. Each tensor
             has a shape of (num_categories + 4, H, W), where the last 4 channels represent the bounding box.
+        threshold (float, optional): The confidence threshold for filtering predictions. Defaults to 0.0.
         output_stride_h (int, optional): The stride of the output feature map in height. Defaults to 4.
         output_stride_w (int, optional): The stride of the output feature map in width. Defaults to 4.
         output_file (str, optional): Path to save the results as a JSON file. If None, the results
@@ -80,25 +82,25 @@ def convert_predictions_to_coco_format(
 
     Returns:
         list[dict[str, object]]: A list of dictionaries formatted according to COCO annotation format.
-            Each dictionary contains:
-            - "image_id" (int): The ID of the corresponding image.
-            - "category_id" (int): The ID of the detected category.
-            - "bbox" (list[float]): The bounding box in COCO format [x, y, width, height].
-            - "score" (float): The confidence score of the prediction.
+            The list has the following form:
+
+            .. code-block:: python
+
+                [
+                    {
+                        "image_id": int,                # The ID of the corresponding image.
+                        "category_id": int,             # The ID of the detected category.
+                        "bbox": [x, y, width, height],  # The bounding box in COCO format [x, y, width, height].
+                        "score": float,                 # The confidence score of the prediction.
+                    },
+                    ...,
+                ]
 
     Notes:
         - The function rescales bounding boxes based on the original image dimensions.
         - It uses a progress bar (via `tqdm`) to track processing progress.
         - If `output_file` is provided, the results are saved as a JSON file.
-
     """
-    # [{
-    #     "image_id": int,
-    #     "category_id": int,
-    #     "bbox": [x, y, width, height],
-    #     "score": float,
-    # }]
-
     results = []
 
     pred_shape = preds[0].shape
@@ -115,19 +117,21 @@ def convert_predictions_to_coco_format(
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
                         box = pred[num_categories:, i, j].tolist()
-                        results.append(
-                            {
-                                "image_id": img_info["id"],
-                                "category_id": category + 1,
-                                "bbox": [
-                                    (j * output_stride_h - box[0]) * width_scale_factor,
-                                    (i * output_stride_w - box[1])
-                                    * height_scale_factor,
-                                    (box[2] + box[0]) * width_scale_factor,
-                                    (box[3] + box[1]) * height_scale_factor,
-                                ],
-                                "score": pred[category, i, j].item(),
-                            }
+                        score = pred[category, i, j].item()
+                        if score >= threshold:
+                            results.append(
+                                {
+                                    "image_id": img_info["id"],
+                                    "category_id": category + 1,
+                                    "bbox": [
+                                        (j * output_stride_h - box[0]) * width_scale_factor,
+                                        (i * output_stride_w - box[1])
+                                        * height_scale_factor,
+                                        (box[2] + box[0]) * width_scale_factor,
+                                        (box[3] + box[1]) * height_scale_factor,
+                                    ],
+                                    "score": score,
+                                }
                         )
             pbar.update(1)
 
@@ -161,6 +165,13 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "ann_file", type=str, help="path to json-file with annotation in COCO format"
+    )
+
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.0,
+        help="threshold for filtering predictions with low confidence",
     )
 
     parser.add_argument(
@@ -199,5 +210,6 @@ if __name__ == "__main__":
     _ = convert_predictions_to_coco_format(
         dataset["images_info"],
         predictions,
+        threshold = args.threshold,
         output_file=args.output_file or None,
     )
