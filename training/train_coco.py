@@ -1,5 +1,6 @@
 import argparse
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -220,10 +221,18 @@ def train(run_folder, model_conf, train_conf, data_conf):
 
     save_model(
         model,
-        model_conf["weights_path"],
+        run_folder,
         tag=tag,
         backbone=model_conf["backbone"]["name"],
     )
+
+    if model_conf["weights_path"]:
+        save_model(
+            model,
+            model_conf["weights_path"],
+            tag=tag,
+            backbone=model_conf["backbone"]["name"],
+        )
 
     loss_df = pd.DataFrame(
         {
@@ -237,8 +246,9 @@ def train(run_folder, model_conf, train_conf, data_conf):
 def train_with_config(filepath):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_folder = f"runs/training_{timestamp}"
-
     model_conf, train_conf, data_conf = load_config(filepath)
+    os.makedirs(run_folder)
+    shutil.copy(filepath, run_folder)
     train(run_folder, model_conf, train_conf, data_conf)
 
 
