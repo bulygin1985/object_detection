@@ -23,7 +23,6 @@ from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
 
-
 BBOX_PART_LEN = 4
 IMG_HEIGHT = IMG_WIDTH = 256
 
