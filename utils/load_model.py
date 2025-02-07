@@ -39,10 +39,9 @@ def load_model(
 
     Args:
         device (torch.device): The device (CPU or GPU) where the model will be loaded.
-        model_type (Type[nn.Module]): The class of the model to be instantiated.
+        config_filepath (str): path to config file.
         checkpoint_path (str, optional): Path to the model checkpoint file. Defaults to
             "../models/checkpoints/pretrained_weights.pt" if not provided.
-        kwargs: Additional keyword arguments to pass to the model constructor.
 
     Returns:
         nn.Module: The loaded model instance.
