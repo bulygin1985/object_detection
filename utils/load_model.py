@@ -32,11 +32,7 @@ def create_model_from_config_file(
 
 
 def load_model(
-    device: torch.device,
-    model_type: Type[nn.Module],
-    config_filepath: str = None,
-    checkpoint_path: str = None,
-    **kwargs,
+    device: torch.device, config_filepath: str = None, checkpoint_path: str = None
 ) -> nn.Module:
     """
     Loads a PyTorch model from a checkpoint file and moves it to the specified device.
@@ -62,10 +58,7 @@ def load_model(
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
 
-    if config_filepath:
-        model = create_model_from_config_file(config_filepath, device, False)
-    else:
-        model = model_type(filters_size=[128, 64, 32], **kwargs).to(device)
+    model = create_model_from_config_file(config_filepath, device, False)
     model.load_state_dict(
         torch.load(
             checkpoint_path,

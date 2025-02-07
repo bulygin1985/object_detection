@@ -193,10 +193,8 @@ if __name__ == "__main__":
 
     model = load_model(
         device,
-        ModelBuilder,
         config_filepath=args.config,
         checkpoint_path=args.model_weights,
-        alpha=0.25,
     )
 
     dataset = prepare_dataset(
