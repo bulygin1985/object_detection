@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 import torch
+from config import load_config
 from load_model import load_model
 from predictions import get_predictions
 from torch.utils.data import Subset
@@ -21,6 +22,7 @@ from tqdm import tqdm
 from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
+
 
 BBOX_PART_LEN = 4
 IMG_HEIGHT = IMG_WIDTH = 256
@@ -157,10 +159,19 @@ if __name__ == "__main__":
         description="This script converts predictions to coco format json"
     )
 
-    parser.add_argument("imgs_dir", type=str, help="path to images")
+    parser.add_argument("config", type=str, help="path to config file")
 
     parser.add_argument(
-        "ann_file", type=str, help="path to json-file with annotation in COCO format"
+        "-s",
+        "--set",
+        type=str,
+        help="Set of images to use ('train', 'val' or 'test') as described in config file",
+    )
+
+    parser.add_argument("--imgs_dir", type=str, help="path to images")
+
+    parser.add_argument(
+        "--ann_file", type=str, help="path to json-file with annotation in COCO format"
     )
 
     parser.add_argument(
@@ -170,8 +181,6 @@ if __name__ == "__main__":
         help="list of images ids to get predictions; "
         "should be passed in form 1,2,3,4,5",
     )
-
-    parser.add_argument("-c", "--config", type=str, help="path to config file")
 
     parser.add_argument(
         "--model_weights",
@@ -188,8 +197,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    imgs_ids = args.imgs_ids.split(",")
-    imgs_ids_int = list(map(int, imgs_ids))
+    imgs_ids_int = None
+    if args.imgs_ids:
+        imgs_ids = args.imgs_ids.split(",")
+        imgs_ids_int = list(map(int, imgs_ids))
 
     model = load_model(
         device,
@@ -197,9 +208,24 @@ if __name__ == "__main__":
         checkpoint_path=args.model_weights,
     )
 
+    if args.set:
+        _, _, data_conf = load_config(args.config)
+        imgs_dir = data_conf[args.set]["images_folder"]
+        ann_file = data_conf[args.set]["ann_file"]
+    if args.imgs_dir:
+        imgs_dir = args.imgs_dir
+    if args.ann_file:
+        ann_file = args.ann_file
+    assert (
+        args.set or args.imgs_dir
+    ), "either 'set' org 'imgs_dir' arguments must be passed"
+    assert (
+        args.set or args.ann_file
+    ), "either 'set' org 'ann_file' arguments must be passed"
+
     dataset = prepare_dataset(
-        imgs_dir=args.imgs_dir,
-        ann_file=args.ann_file,
+        imgs_dir=imgs_dir,
+        ann_file=ann_file,
         imgs_ids=imgs_ids_int,
     )
     dataset_transformed = transform_dataset(dataset["annotations"])

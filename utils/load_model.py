@@ -28,7 +28,7 @@ def create_model_from_config_file(
 ):
     """Creates a model given config."""
     model_conf, _, data_conf = load_config(config_filepath)
-    return create_model(model_conf, data_conf, device, load_weights)
+    return create_model(model_conf, data_conf, device, load_weights=load_weights)
 
 
 def load_model(
