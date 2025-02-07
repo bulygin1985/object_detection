@@ -80,28 +80,3 @@ def visualize_heatmap(heatmap):
         (heatmap_np * 255).astype(np.uint8), cv2.COLORMAP_JET
     )
     return colored_heatmap
-
-
-def combine_visualizations(image, boxes, labels, heatmaps, alpha: float = 0.7):
-    """
-    Combine original image, bounding boxes, and heatmaps into a single visualization
-    Args:
-        image (np.ndarray): Original image
-        boxes (torch.Tensor): Bounding boxes
-        labels (torch.Tensor): Class labels
-        heatmaps (torch.Tensor): Heatmaps tensor [C, H, W]
-        alpha (float): transparency of the hitmap in relation to the origin image 0 - only heatmap
-                                                                                  1 - only image without heatmap
-    Returns:
-        np.ndarray: Combined visualization
-    """
-    img_with_boxes = get_image_with_bboxes(image, boxes, labels)
-
-    max_heatmap, _ = torch.max(heatmaps, dim=0)
-    colored_heatmap = visualize_heatmap(max_heatmap)
-
-    colored_heatmap = cv2.resize(colored_heatmap, (image.shape[1], image.shape[0]))
-
-    blended = cv2.addWeighted(img_with_boxes, alpha, colored_heatmap, 1 - alpha, 0)
-
-    return np.hstack([img_with_boxes, colored_heatmap, blended])

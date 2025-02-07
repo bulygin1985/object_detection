@@ -9,21 +9,26 @@ Reference 2: https://github.com/yukkyo/voc2coco/blob/master/voc2coco.py
 5. this script doesn't convert segmentation
 
 Example to run:
-python voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
+python dataset_voc2coco.py /path/to/input/voc/Annotations --coco_ann_dir /path/to/output/coco/annotations --labels_file /path/to/output/labels.txt --min_area 4 --output_form both --voc_ann_ids_dir /path/to/input/voc/ImageSets/Main
 
 or using the default values:
 
-python voc2coco.py --voc_ann_dir /path/to/input/voc/Annotations
+python dataset_voc2coco.py /path/to/input/voc/Annotations
 """
 
 import argparse
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Dict, List
 
 import defusedxml.ElementTree as ET
 from tqdm import tqdm
+
+from loggers.logger import LOGGER_NAME
+
+SCRIPT_NAME = "dataset_voc2coco"
 
 ALLOWED_EXTENSIONS = [".jpg", ".png", ".jpeg", ".JPG", ".PNG", ".JPEG"]
 
@@ -73,7 +78,8 @@ def get_class2id(classes: List[str]) -> Dict[str, int]:
     return dict(zip(classes, classes_ids))
 
 
-def get_ann_files(ann_ids_dir: str) -> Dict:
+def get_ann_files(ann_ids_dir: str) -> tuple[bool, Dict]:
+    with_issues = False
     ann_paths = {}
     for ann_ids_filename in os.listdir(ann_ids_dir):
         ann_ids_path = os.path.join(ann_ids_dir, ann_ids_filename)
@@ -85,8 +91,8 @@ def get_ann_files(ann_ids_dir: str) -> Dict:
             with open(ann_ids_path, "r") as f:
                 rows = f.readlines()
                 if not rows:
-                    # todo (AA): log
-                    print(f"Skipping {ann_ids_path}: file is empty")
+                    with_issues = True
+                    logger.warning(f"Skipping {ann_ids_path}: file is empty")
                 else:
                     ann_ids = []
                     for r in rows:
@@ -100,15 +106,15 @@ def get_ann_files(ann_ids_dir: str) -> Dict:
                             if int(used) == 1:
                                 ann_ids.append(ann_id)
                         else:
-                            # todo (AA): log error
-                            print(
+                            with_issues = True
+                            logger.warning(
                                 f"Skipping {ann_ids_path}: file format not recognized. Make sure your annotation follows "
                                 f"VOC format!"
                             )
                             break
 
                     ann_paths[ann_ids_name] = [aid + ".xml" for aid in ann_ids]
-    return ann_paths
+    return with_issues, ann_paths
 
 
 def get_image_info(annotation_root):
@@ -117,21 +123,25 @@ def get_image_info(annotation_root):
         filename = annotation_root.findtext("filename")
     else:
         filename = os.path.basename(path)
-    img_name = os.path.basename(filename)
+    img_filename = os.path.basename(filename)
 
-    img_id, img_ext = os.path.splitext(img_name)
+    rev_filename = "".join(reversed(img_filename))
+    rev_id_part_filename, _, _ = rev_filename.partition("_")
+    id_part_filename = "".join(reversed(rev_id_part_filename))
+    img_id, img_ext = os.path.splitext(id_part_filename)
+
     if not img_ext in ALLOWED_EXTENSIONS:
-        raise ValueError(f"Image extension is not valid! Got {img_name}")
+        raise ValueError(f"Image extension is not valid! Got {img_filename}")
 
     if not img_id.isdigit():
-        raise ValueError(f"Image file should contain digits only! Got {img_name}")
+        raise ValueError(f"Image file should contain digits only! Got {img_filename}")
 
     size = annotation_root.find("size")
     width = int(size.findtext("width"))
     height = int(size.findtext("height"))
 
     image_info = {
-        "file_name": img_name,
+        "file_name": img_filename,
         "height": height,
         "width": width,
         "id": int(img_id),
@@ -139,7 +149,7 @@ def get_image_info(annotation_root):
     return image_info
 
 
-def get_coco_annotation_from_obj(obj, label2id, min_area):
+def get_coco_annotation_from_obj(obj, ann_file, label2id, min_area) -> dict:
     label = obj.findtext("name")
     assert label in label2id, f"Error: {label} is not in label2id!"
     category_id = label2id[label]
@@ -149,14 +159,22 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
     xmax = int(float(bndbox.findtext("xmax")))
     ymax = int(float(bndbox.findtext("ymax")))
     if xmin >= xmax or ymin >= ymax:
+        logger.warning(
+            f"xmin >= xmax or ymin >= ymax, skipping this bounding box. Annotation file: {ann_file}. "
+            f"Bounding box {bndbox}"
+        )
         return {}
     o_width = xmax - xmin
     o_height = ymax - ymin
     area = o_width * o_height
     if area <= min_area:
+        logger.warning(
+            f"area <= min_area, skipping this bounding box. Annotation file: {ann_file}."
+            f"Bounding box {bndbox}"
+        )
         return {}
     ann = {
-        "area": o_width * o_height,
+        "area": area,
         "iscrowd": 0,
         "bbox": [xmin, ymin, o_width, o_height],
         "category_id": category_id,
@@ -166,13 +184,15 @@ def get_coco_annotation_from_obj(obj, label2id, min_area):
     return ann
 
 
-def convert_xmls_to_cocojson(
+def convert_xmls_to_coco(
     voc_ann_dir: str,
     annotation_files: List[str],
     label2id: Dict[str, int],
     output_jsonpath: str,
     min_area: int,
-):
+) -> tuple[bool, Dict[str, object]]:
+    with_issues = False
+
     output_json_dict = {
         "images": [],
         "type": "instances",
@@ -180,17 +200,19 @@ def convert_xmls_to_cocojson(
         "categories": [],
     }
     bnd_id = 1  # START_BOUNDING_BOX_ID
-    print("Start converting!")
-    for a_file in tqdm(annotation_files):
+    for ann_file in tqdm(annotation_files):
         # Read annotation xml
-        ann_tree = ET.parse(os.path.join(voc_ann_dir, a_file))
+        logger.info(f"Start converting {ann_file}")
+        ann_tree = ET.parse(os.path.join(voc_ann_dir, ann_file))
         ann_root = ann_tree.getroot()
 
         try:
             img_info = get_image_info(annotation_root=ann_root)
         except ValueError as e:
-            # todo (AA): log error
-            print(f"Cannot get image info due to the error: {e}")
+            with_issues = True
+            logger.error(
+                f"Cannot get image info for annotation file '{ann_file}' due to the error: {e}"
+            )
             continue
         img_id = img_info["id"]
 
@@ -199,7 +221,7 @@ def convert_xmls_to_cocojson(
         )
         for obj in ann_root.findall("object"):
             ann = get_coco_annotation_from_obj(
-                obj=obj, label2id=label2id, min_area=min_area
+                ann_file=ann_file, obj=obj, label2id=label2id, min_area=min_area
             )
             if ann:
                 ann.update({"image_id": img_id, "id": bnd_id})
@@ -210,21 +232,28 @@ def convert_xmls_to_cocojson(
         if valid_image:
             output_json_dict["images"].append(img_info)
         else:
-            print(
-                f"Image {img_id} is removed since it does not contain any valid object"
+            with_issues = True
+            logger.error(
+                f"Image {img_id} (filename {img_info["file_name"]}) is removed since "
+                f"it does not contain any valid object"
             )
 
     for label, label_id in label2id.items():
         category_info = {"supercategory": "none", "id": label_id, "name": label}
         output_json_dict["categories"].append(category_info)
 
-    with open(output_jsonpath, "w") as f:
-        output_json = json.dumps(output_json_dict)
-        f.write(output_json)
-        print(f"The COCO format annotation is saved to {output_jsonpath}")
+    if output_jsonpath:
+        with open(output_jsonpath, "w") as f:
+            output_json = json.dumps(output_json_dict)
+            f.write(output_json)
+            logger.info(f"The COCO format annotation is saved to {output_jsonpath}")
+
+    return with_issues, output_json_dict
 
 
-def main():
+def main() -> bool:
+    with_issues = False
+
     parser = argparse.ArgumentParser(
         description="This script converts voc format xmls to coco format json"
     )
@@ -259,6 +288,7 @@ def main():
     )
 
     args = parser.parse_args()
+    logger.info(f"Running with args: {args}")
 
     min_area = args.min_area
     assert min_area >= 0
@@ -283,15 +313,17 @@ def main():
 
     if output_form in [SPLIT, BOTH]:
         output_path_fmt = os.path.join(coco_ann_dir, "%s_cocoformat.json")
-        ann_files = get_ann_files(ann_ids_dir=voc_ann_ids_dir)
+        curr_with_issues, ann_files = get_ann_files(ann_ids_dir=voc_ann_ids_dir)
+        with_issues |= curr_with_issues
         for mode, ann_file in ann_files.items():
-            convert_xmls_to_cocojson(
+            curr_with_issues = convert_xmls_to_coco(
                 voc_ann_dir=voc_ann_dir,
                 annotation_files=ann_file,
                 label2id=label2id,
                 output_jsonpath=output_path_fmt % mode,
                 min_area=min_area,
             )
+            with_issues |= curr_with_issues
 
     if output_form in [JOINED, BOTH]:
         ann_files = [
@@ -300,14 +332,32 @@ def main():
             if os.path.isfile(os.path.join(voc_ann_dir, ann_filename))
             and os.path.splitext(ann_filename)[1] == ".xml"
         ]
-        convert_xmls_to_cocojson(
+        curr_with_issues, _ = convert_xmls_to_coco(
             voc_ann_dir=voc_ann_dir,
             annotation_files=ann_files,
             label2id=label2id,
             output_jsonpath=os.path.join(coco_ann_dir, "all_cocoformat.json"),
             min_area=min_area,
         )
+        with_issues |= curr_with_issues
+
+    return with_issues
 
 
 if __name__ == "__main__":
-    main()
+    logger = logging.getLogger(f"{LOGGER_NAME}.{SCRIPT_NAME}")
+
+    logger.info(f"Started transformation of dataset from VOC to COCO format")
+    with_issues = False
+    try:
+        with_issues = main()
+    except Exception:
+        logger.exception("Transformation finished with ERROR")
+        raise
+
+    if with_issues:
+        logger.warning(
+            "Transformation finished with WARNINGS. Please check the log for more details"
+        )
+    else:
+        logger.info("Transformation finished successfully without issues")

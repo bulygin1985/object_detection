@@ -15,7 +15,7 @@
     }
   },
   "train": {
-    "is_overfit": false,
+    "is_overfit": true,
     "lr": 5e-2,
     "batch_size": 32,
     "subset_len": 128,
@@ -39,6 +39,19 @@
     }
   },
   "data": {
-    "is_download": false
+    "is_download": false,
+    "class_amount": 20,
+    "train": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_train2007.json"
+    },
+    "val": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_val2007.json"
+    },
+    "test": {
+      "images_folder": "../../VOC_test/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_test2007.json"
+    }
   }
 }

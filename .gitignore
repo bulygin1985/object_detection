@@ -1,6 +1,10 @@
 VOC/
+VOC_COCO/
 COCO/
 __pycache__/
 .idea/
+logs/
 models/checkpoints/*.pt
-
+PASCAL_VOC/
+runs/
+/training/losses*

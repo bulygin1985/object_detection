@@ -1,9 +1,11 @@
 import argparse
+from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import torch
-import torchvision
 import torchvision.transforms.v2 as transforms
+from torch.utils.tensorboard import SummaryWriter
 
 from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
@@ -11,16 +13,37 @@ from models.centernet import ModelBuilder
 from training.encoder import CenternetEncoder
 from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def criteria_builder(stop_loss, stop_epoch):
     def criteria_satisfied(current_loss, current_epoch):
         if stop_loss is not None and current_loss < stop_loss:
             return True
-        if stop_epoch is not None and current_epoch > stop_epoch:
+        if stop_epoch is not None and current_epoch >= stop_epoch:
             return True
         return False
 
     return criteria_satisfied
+
+
+def log_stats(tensorboard_writer, epoch, lr, losses: dict):
+    train_validation_loss = losses["validation"]["train"]
+    val_validation_loss = losses["validation"]["val"]
+    # Write to Tensorboard
+    tensorboard_writer.add_scalar("Train/loss", train_validation_loss, epoch)
+    tensorboard_writer.add_scalar("Val/loss", val_validation_loss, epoch)
+    tensorboard_writer.add_scalar("Train/lr", lr, epoch)
+
+    # Verbose
+    print("= = = = = = = = = =")
+    print(
+        (
+            f"Epoch {epoch} train loss = {train_validation_loss},"
+            f"val loss = {val_validation_loss}"
+        )
+    )
+    print("= = = = = = = = = =")
 
 
 def save_model(model, weights_path: str = None, **kwargs):
@@ -37,6 +60,28 @@ def save_model(model, weights_path: str = None, **kwargs):
     print(f"Saved model checkpoint to {checkpoint_filename}")
 
 
+def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
+    batch_generator = torch.utils.data.DataLoader(
+        data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+    )
+    loss = 0.0
+    count = 0
+    with torch.no_grad():
+        for i, data in enumerate(batch_generator):
+            input_data, gt_data = data
+            input_data = input_data.to(device).contiguous()
+
+            gt_data = gt_data.to(device)
+            gt_data.requires_grad = False
+
+            loss_dict = model(input_data, gt=gt_data)
+            curr_loss = loss_dict["loss"].item()
+            curr_count = input_data.shape[0]
+            loss += curr_loss * curr_count
+            count += curr_count
+    return loss / count
+
+
 def main(config_path: str = None):
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--config", type=str, help="path to config file")
@@ -50,10 +95,21 @@ def main(config_path: str = None):
 
 
 def train(model_conf, train_conf, data_conf):
-    print(f"Selected image_set: {data_conf["image_set"]}")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    writer = SummaryWriter(f"runs/training_{timestamp}")
 
-    dataset_loader = MSCOCODatasetLoader(
-        data_conf["images_folder"], data_conf["ann_file"]
+    image_set_train = "val" if train_conf["is_overfit"] else "train"
+    image_set_val = "test" if train_conf["is_overfit"] else "val"
+    print(f"Selected training image_set: {image_set_train}")
+    print(f"Selected validation image_set: {image_set_val}")
+
+    train_ds_loader = MSCOCODatasetLoader(
+        data_conf[image_set_train]["images_folder"],
+        data_conf[image_set_train]["ann_file"],
+    )
+    val_ds_loader = MSCOCODatasetLoader(
+        data_conf[image_set_val]["images_folder"],
+        data_conf[image_set_val]["ann_file"],
     )
     transform = transforms.Compose(
         [
@@ -63,33 +119,40 @@ def train(model_conf, train_conf, data_conf):
         ]
     )
     encoder = CenternetEncoder(
-        IMG_HEIGHT, IMG_WIDTH, n_classes=data_conf["class_amount"]
+        IMG_HEIGHT, IMG_WIDTH, n_classes=data_conf.get("class_amount")
     )
 
-    torch_dataset = Dataset(
-        dataset=dataset_loader.get_dataset(),
+    train_data = Dataset(
+        dataset=train_ds_loader.get_dataset(),
+        transformation=transform,
+        encoder=encoder,
+    )
+    val_data = Dataset(
+        dataset=val_ds_loader.get_dataset(),
         transformation=transform,
         encoder=encoder,
     )
 
     tag = "train"
-    training_data = torch_dataset
     batch_size = train_conf["batch_size"]
+    train_subset_len = train_conf.get("subset_len")
+    val_subset_len = train_conf.get("val_subset_len")
+    num_workers = train_conf.get("num_workers", 0)
 
     if train_conf["is_overfit"]:
         tag = "overfit"
-        training_data = torch.utils.data.Subset(
-            torch_dataset, range(train_conf["subset_len"])
-        )
-        batch_size = train_conf["subset_len"]
+        batch_size = train_subset_len
+    if train_subset_len is not None:
+        train_data = torch.utils.data.Subset(train_data, range(train_subset_len))
+    if val_subset_len is not None:
+        val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
-        class_number=data_conf["class_amount"],
+        class_number=data_conf.get("class_amount"),
         backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
@@ -109,16 +172,20 @@ def train(model_conf, train_conf, data_conf):
 
     model.train(True)
 
-    batch_generator = torch.utils.data.DataLoader(
-        training_data, num_workers=0, batch_size=batch_size, shuffle=False
+    batch_generator_train = torch.utils.data.DataLoader(
+        train_data, num_workers=num_workers, batch_size=batch_size, shuffle=False
     )
 
     epoch = 1
-    get_desired_loss = False
+
+    train_loss_history = []
+    val_loss_history = []
+
+    calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
 
     while True:
         loss_dict = {}
-        for i, data in enumerate(batch_generator):
+        for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
 
@@ -126,7 +193,7 @@ def train(model_conf, train_conf, data_conf):
             gt_data.requires_grad = False
 
             loss_dict = model(input_data, gt=gt_data)
-            optimizer.zero_grad()  # compute gradient and do optimize step
+            optimizer.zero_grad()
             loss_dict["loss"].backward()
 
             optimizer.step()
@@ -134,11 +201,34 @@ def train(model_conf, train_conf, data_conf):
             curr_lr = scheduler.get_last_lr()[0]
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
+        if calculate_epoch_loss:
+            last_lr = scheduler.get_last_lr()[0]
+            train_validation_loss = calculate_validation_loss(
+                model, train_data, batch_size, num_workers
+            )
+            val_validation_loss = calculate_validation_loss(
+                model, val_data, batch_size, num_workers
+            )
+            train_loss_history.append(train_validation_loss)
+            val_loss_history.append(val_validation_loss)
+
+            loss_stats = {
+                "validation": {
+                    "train": train_validation_loss,
+                    "val": val_validation_loss,
+                }
+            }
+            log_stats(writer, epoch, last_lr, loss_stats)
+
         if criteria_satisfied(loss, epoch):
             break
 
-        scheduler.step(loss_dict["loss"])
+        check_loss_value = train_validation_loss if calculate_epoch_loss else loss
+
+        scheduler.step(check_loss_value)
         epoch += 1
+
+    writer.close()
 
     save_model(
         model,
@@ -147,6 +237,14 @@ def train(model_conf, train_conf, data_conf):
         backbone=model_conf["backbone"]["name"],
     )
 
+    loss_df = pd.DataFrame(
+        {
+            "train_loss": train_loss_history,
+            "val_loss": val_loss_history,
+        }
+    )
+    loss_df.to_csv(f"losses_{timestamp}.csv")
+
 
 if __name__ == "__main__":
-    main("config_example.json")
+    main("config_example_quick_train_with_epoch_loss.json")

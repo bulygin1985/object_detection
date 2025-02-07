@@ -15,10 +15,12 @@
     }
   },
   "train": {
-    "is_overfit": true,
+    "is_overfit": false,
     "lr": 5e-2,
     "batch_size": 32,
-    "subset_len": 10,
+    "subset_len": 128,
+    "val_subset_len": 96,
+    "calculate_epoch_loss": true,
     "lr_schedule": {
       "patience": 100,
       "factor": 0.5,
@@ -32,8 +34,17 @@
   "data": {
     "is_download": false,
     "class_amount": 20,
-    "image_set": "val",
-    "images_folder": "../VOC/VOCdevkit/VOC2007/JPEGImages",
-    "ann_file": "../VOC_COCO/pascal_val2007.json"
+    "train": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_train2007.json"
+    },
+    "val": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_val2007.json"
+    },
+    "test": {
+      "images_folder": "../../VOC_test/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_test2007.json"
+    }
   }
 }
