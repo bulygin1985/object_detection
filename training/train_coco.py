@@ -60,6 +60,39 @@ def save_model(model, weights_path: str = None, **kwargs):
     print(f"Saved model checkpoint to {checkpoint_filename}")
 
 
+def compose_transforms(data_augmentation_params=None):
+    transforms_list = [transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT))]
+    if data_augmentation_params:
+        resize_crop_scale = data_augmentation_params.get(
+            "random_resize_crop_scale", None
+        )
+        resize_crop_ratio = data_augmentation_params.get(
+            "random_resize_crop_ratio", None
+        )
+        if resize_crop_scale is not None or resize_crop_ratio is not None:
+            print(
+                f"Applying RandomResizedCrop scale={resize_crop_scale} ratio={resize_crop_ratio}"
+            )
+            transforms_list = [
+                transforms.RandomResizedCrop(
+                    size=(IMG_WIDTH, IMG_HEIGHT),
+                    scale=resize_crop_scale,
+                    ratio=resize_crop_ratio,
+                )
+            ]
+        if data_augmentation_params.get("random_flip_horizontal"):
+            print("Applying random_flip_horizontal")
+            transforms_list.append(transforms.RandomHorizontalFlip())
+        brightness_jitter = data_augmentation_params.get("color_jitter_brightness")
+        if brightness_jitter:
+            print(f"Applying color_jitter_brightness={brightness_jitter}")
+            transforms_list.append(transforms.ColorJitter(brightness=brightness_jitter))
+    return transforms.Compose(
+        transforms_list
+        + [transforms.ToImage(), transforms.ToDtype(torch.float32, scale=True)]
+    )
+
+
 def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     batch_generator = torch.utils.data.DataLoader(
         data, num_workers=num_workers, batch_size=batch_size, shuffle=False
@@ -111,25 +144,20 @@ def train(model_conf, train_conf, data_conf):
         data_conf[image_set_val]["images_folder"],
         data_conf[image_set_val]["ann_file"],
     )
-    transform = transforms.Compose(
-        [
-            transforms.Resize(size=(IMG_WIDTH, IMG_HEIGHT)),
-            transforms.ToImage(),
-            transforms.ToDtype(torch.float32, scale=True),
-        ]
-    )
+    train_transform = compose_transforms(train_conf.get("data_augmentation"))
+    val_transform = compose_transforms()
     encoder = CenternetEncoder(
         IMG_HEIGHT, IMG_WIDTH, n_classes=data_conf.get("class_amount")
     )
 
     train_data = Dataset(
         dataset=train_ds_loader.get_dataset(),
-        transformation=transform,
+        transformation=train_transform,
         encoder=encoder,
     )
     val_data = Dataset(
         dataset=val_ds_loader.get_dataset(),
-        transformation=transform,
+        transformation=val_transform,
         encoder=encoder,
     )
 

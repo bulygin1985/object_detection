@@ -1,0 +1,56 @@
+{
+  "model": {
+    "alpha": 1.0,
+    "weights_path": null,
+    "backbone": {
+      "name": "efficientnet_b0",
+      "pretrained_weights": "DEFAULT"
+    },
+    "head": {
+      "filters_size": [
+        128,
+        64,
+        32
+      ]
+    }
+  },
+  "train": {
+    "is_overfit": false,
+    "lr": 4e-2,
+    "batch_size": 32,
+    "subset_len": null,
+    "val_subset_len": null,
+    "calculate_epoch_loss": true,
+    "data_augmentation": {
+        "random_flip_horizontal": true,
+        "random_resize_crop_scale": [0.5, 1.0],
+        "random_resize_crop_ratio": [0.6667, 1.5],
+        "color_jitter_brightness": 0.25
+    },    
+    "lr_schedule": {
+      "patience": 3,
+      "factor": 0.5,
+      "min_lr": 2e-5
+    },
+    "stop_criteria": {
+      "loss": 1.0,
+      "epoch": 125
+    }
+  },
+  "data": {
+    "is_download": false,
+    "class_amount": 20,
+    "train": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_train2007.json"
+    },
+    "val": {
+      "images_folder": "../../VOC/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_val2007.json"
+    },
+    "test": {
+      "images_folder": "../../VOC_test/VOCdevkit/VOC2007/JPEGImages",
+      "ann_file": "../../PASCAL_COCO/pascal_test2007.json"
+    }
+  }
+}
