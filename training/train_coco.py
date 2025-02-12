@@ -135,12 +135,11 @@ def train(config_filepath):
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
 
-    backbone_name = model_conf["backbone"]["name"]
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
         class_number=data_conf.get("class_amount"),
-        backbone=backbone_name,
+        backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
@@ -254,7 +253,7 @@ def train(config_filepath):
         model,
         run_folder,
         tag=tag,
-        backbone=backbone_name,
+        backbone=model_conf["backbone"]["name"],
     )
 
     if model_conf["weights_path"]:
@@ -262,7 +261,7 @@ def train(config_filepath):
             model,
             model_conf["weights_path"],
             tag=tag,
-            backbone=backbone_name,
+            backbone=model_conf["backbone"]["name"],
         )
 
     loss_df = pd.DataFrame(
