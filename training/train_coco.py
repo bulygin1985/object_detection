@@ -82,7 +82,6 @@ def train(config_filepath):
     run_folder = f"runs/training_{timestamp}"
     os.makedirs(run_folder)
     shutil.copy(config_filepath, run_folder)
-
     writer = SummaryWriter(run_folder)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
