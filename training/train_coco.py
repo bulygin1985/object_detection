@@ -10,6 +10,7 @@ import torch
 import torchvision.transforms.v2 as transforms
 from torch.utils.tensorboard import SummaryWriter
 
+from callbacks.save_checkpoint import SaveCheckPoint
 from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
@@ -173,6 +174,15 @@ def train(config_filepath):
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
     save_best_model = train_conf.get("save_best_model", False)
     save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
+    checkpoint_callback = None
+    if save_best_model:
+        checkpoint_callback = SaveCheckPoint(
+            model,
+            run_folder,
+            monitor="val_loss",
+            best_mode="min",
+            skip_epochs=save_best_model_skip_epochs,
+        )
 
     while True:
         epoch_start = time.perf_counter()
@@ -194,7 +204,7 @@ def train(config_filepath):
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
         print("= = = = = = = = = =")
-        if calculate_epoch_loss:
+        if calculate_epoch_loss or save_best_model:
             last_lr = scheduler.get_last_lr()[0]
             train_validation_loss = calculate_validation_loss(
                 model, train_data, batch_size, num_workers
@@ -206,13 +216,6 @@ def train(config_filepath):
             val_loss_history.append(val_validation_loss)
             if val_validation_loss < best_val_loss:
                 best_val_loss = val_validation_loss
-                if save_best_model and epoch > save_best_model_skip_epochs:
-                    save_model(
-                        model,
-                        run_folder,
-                        tag=tag + "_best",
-                        backbone=backbone_name,
-                    )
             best_val_loss_history.append(best_val_loss)
 
             loss_stats = {
@@ -229,6 +232,10 @@ def train(config_filepath):
                     f"best val loss = {best_val_loss:.4f}"
                 )
             )
+            if checkpoint_callback is not None:
+                checkpoint_callback.on_epoch_end(
+                    epoch, {"val_loss": val_validation_loss}
+                )
 
         print(
             f"Epoch calculation time is {time.perf_counter()-epoch_start:.2f} seconds"
