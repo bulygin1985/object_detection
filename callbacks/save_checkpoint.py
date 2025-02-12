@@ -8,10 +8,18 @@ class SaveCheckPoint:
         self,
         model: torch.nn.Module,
         log_dir: str,
-        monitor: str = "val_loss",
+        monitor: Optional[str] = "val_loss",
         best_mode: str = "min",
         skip_epochs=0,
     ):
+        """Init save checkpoint callback.
+        Args:
+            model (torch.nn.Module): model which weights to save
+            logs_dir (str): folder where to save checkpoints
+            monitor (Optional[str]): metric to monitor for saving best model
+            best_mode (str - "min" or "max"): rule to distinguish 'best' value
+            skip_epochs (int): skip saving for number of initials epochs
+        """
         self.model = model
         self.log_dir = log_dir
         self.monitor_metric = monitor
