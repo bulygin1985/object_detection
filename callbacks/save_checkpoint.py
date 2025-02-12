@@ -1,5 +1,6 @@
-from typing import Dict, Optional
 import os
+from typing import Dict, Optional
+
 import torch
 
 
