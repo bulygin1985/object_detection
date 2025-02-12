@@ -87,7 +87,11 @@ def compose_transforms(data_augmentation_params=None):
 
 def calculate_loss(model, data, batch_size=32, num_workers=0):
     batch_generator = torch.utils.data.DataLoader(
-        data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+        data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=True,
     )
     loss = 0.0
     count = 0
@@ -183,6 +187,8 @@ def train(model_conf, train_conf, data_conf):
         alpha=model_conf["alpha"],
         backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
+        imagenet_normalization=model_conf.get("imagenet_normalization", False),
+        conv_bias=model_conf["head"].get("conv_bias", False),
     ).to(device)
 
     lr = train_conf["lr"]
@@ -240,7 +246,11 @@ def train(model_conf, train_conf, data_conf):
     model.train(True)
 
     batch_generator_train = torch.utils.data.DataLoader(
-        train_data, num_workers=num_workers, batch_size=batch_size, shuffle=True
+        train_data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=True,
+        pin_memory=True,
     )
 
     epoch = 1

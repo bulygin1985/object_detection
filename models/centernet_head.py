@@ -12,6 +12,7 @@ class Head(nn.Module):
         backbone_output_filters,
         filters_size: list,
         class_number=20,
+        conv_bias: bool = False,
     ):
         super().__init__()
         self.connection_num = 3
@@ -25,7 +26,9 @@ class Head(nn.Module):
             setattr(
                 self,
                 name,
-                self.conv_bn_relu(name, head_filters[i], head_filters[i + 1]),
+                self.conv_bn_relu(
+                    name, head_filters[i], head_filters[i + 1], conv_bias=conv_bias
+                ),
             )
             # create connection with backbone
             if i < self.connection_num:
@@ -34,29 +37,46 @@ class Head(nn.Module):
                     self,
                     name,
                     self.conv_bn_relu(
-                        name, self.backbone_output_filters[-2 - i], self.filters[i], 1
+                        name,
+                        self.backbone_output_filters[-2 - i],
+                        self.filters[i],
+                        1,
+                        conv_bias=conv_bias,
                     ),
                 )
 
         self.before_hm = self.conv_bn_relu(
-            "before_hm", self.filters[-1], self.filters[-1]
+            "before_hm", self.filters[-1], self.filters[-1], conv_bias=conv_bias
         )
         self.before_sizes = self.conv_bn_relu(
-            "before_sizes", self.filters[-1], self.filters[-1]
+            "before_sizes", self.filters[-1], self.filters[-1], conv_bias=conv_bias
         )
 
         self.hm = self.conv_bn_relu(
-            "hm", self.filters[-1], self.class_number, 3, "sigmoid"
+            "hm", self.filters[-1], self.class_number, 3, "sigmoid", conv_bias=conv_bias
         )
-        self.sizes = self.conv_bn_relu("hm", self.filters[-1], 4, 3, None)
+        self.sizes = self.conv_bn_relu(
+            "hm", self.filters[-1], 4, 3, None, conv_bias=conv_bias
+        )
 
     def conv_bn_relu(
-        self, name, input_num, output_num, kernel_size=3, activation="relu"
+        self,
+        name,
+        input_num,
+        output_num,
+        kernel_size=3,
+        activation="relu",
+        conv_bias=False,
     ):
         block = OrderedDict()
         padding = 1 if kernel_size == 3 else 0
         block["conv_" + name] = nn.Conv2d(
-            input_num, output_num, kernel_size=kernel_size, stride=1, padding=padding
+            input_num,
+            output_num,
+            kernel_size=kernel_size,
+            stride=1,
+            padding=padding,
+            bias=conv_bias,
         )
         block["bn_" + name] = nn.BatchNorm2d(output_num, eps=1e-3, momentum=0.01)
         if activation == "relu":

@@ -18,6 +18,8 @@ class ModelBuilder(nn.Module):
         class_number=20,
         backbone: str = "default",
         backbone_weights: str = None,
+        imagenet_normalization: bool = False,
+        conv_bias: bool = False,
     ):
         super().__init__()
         self.class_number = class_number
@@ -28,6 +30,7 @@ class ModelBuilder(nn.Module):
             backbone_output_filters=self.backbone.filters,
             filters_size=filters_size,
             class_number=class_number,
+            conv_bias=conv_bias,
         )
         self.loss = CenternetTTFLoss(
             # todo (AA): is this "4" below the down_ratio parameter?
