@@ -262,7 +262,7 @@ def train(model_conf, train_conf, data_conf):
             log_stats(writer, epoch, last_lr, loss_stats)
 
         elapsed = time.perf_counter() - tstart
-        print(f"epoch calculation time: {elapsed:.3f}")
+        print(f"Epoch calculation time: {elapsed:.3f}")
 
         if criteria_satisfied(loss, epoch):
             break
