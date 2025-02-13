@@ -15,6 +15,30 @@ from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def split_model_batchnorm_parameters(model):
+    """splits model named parameters into 'regular' and 'batch_norm' group."""
+    names_all = set(model.state_dict().keys())
+    result = []
+    bn_param_tail = ".running_var"
+
+    def is_bn_name(name):
+        for suffix in [".bias", ".weight"]:
+            if (
+                name.endswith(suffix)
+                and (name[: -len(suffix)] + bn_param_tail) in names_all
+            ):
+                return True
+        return False
+
+    result_named_params = list(
+        [(name, p) for name, p in model.named_parameters() if not is_bn_name(name)]
+    )
+    result_named_bn_params = list(
+        [(name, p) for name, p in model.named_parameters() if is_bn_name(name)]
+    )
+    return result_named_params, result_named_bn_params
+
+
 def criteria_builder(stop_loss, stop_epoch):
     def criteria_satisfied(current_loss, current_epoch):
         if stop_loss is not None and current_loss < stop_loss:
@@ -236,12 +260,43 @@ def train(model_conf, train_conf, data_conf):
     else:
         lr_head_start, lr_backbone_start = lr_head, lr_backbone
 
-    optimizer = torch.optim.Adam(
-        [
+    weight_decay = train_conf.get("weight_decay")
+    if weight_decay > 0:
+        regular_params, batchnorm_params = split_model_batchnorm_parameters(model)
+        head_regular = [p for n, p in regular_params if n.startswith("head.")]
+        head_bn = [p for n, p in batchnorm_params if n.startswith("head.")]
+        backbone_regular = [
+            (n, p) for n, p in regular_params if n.startswith("backbone.")
+        ]
+        backbone_bn = [(n, p) for n, p in batchnorm_params if n.startswith("backbone.")]
+        if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
+            backbone_regular = filter_named_values_by_prefix(
+                backbone_regular,
+                bb_train_params_patterns_include,
+                bb_train_params_patterns_exclude,
+            )
+            backbone_bn = filter_named_values_by_prefix(
+                backbone_bn,
+                bb_train_params_patterns_include,
+                bb_train_params_patterns_exclude,
+            )
+        opt_params = [
+            {
+                "params": backbone_regular,
+                "lr": lr_backbone_start,
+                "weight_decay": weight_decay,
+            },
+            {"params": backbone_bn, "lr": lr_backbone_start, "weight_decay": 0.0},
+            {"params": head_regular, "lr": lr_head_start, "weight_decay": weight_decay},
+            {"params": head_bn, "lr": lr_head_start, "weight_decay": 0.0},
+        ]
+        print(f"applying weight decay = {weight_decay}")
+    else:
+        opt_params = [
             {"params": trainable_backbone_params, "lr": lr_backbone_start},
             {"params": model.head.parameters(), "lr": lr_head_start},
         ]
-    )
+    optimizer = torch.optim.Adam(opt_params, lr=0.0)
 
     model.train(True)
 
@@ -251,6 +306,7 @@ def train(model_conf, train_conf, data_conf):
         batch_size=batch_size,
         shuffle=True,
         pin_memory=True,
+        persistent_workers=True,
     )
 
     epoch = 1
@@ -273,8 +329,14 @@ def train(model_conf, train_conf, data_conf):
         if not pretrain and epoch == (head_pretrain_epochs + 1):
             if head_pretrain_epochs:
                 # switch optimizer LRs
-                optimizer.param_groups[0]["lr"] = lr_backbone
-                optimizer.param_groups[1]["lr"] = lr_head
+                if weight_decay > 0:
+                    optimizer.param_groups[0]["lr"] = lr_backbone
+                    optimizer.param_groups[1]["lr"] = lr_backbone
+                    optimizer.param_groups[2]["lr"] = lr_head
+                    optimizer.param_groups[3]["lr"] = lr_head
+                else:
+                    optimizer.param_groups[0]["lr"] = lr_backbone
+                    optimizer.param_groups[1]["lr"] = lr_head
             scheduler = create_scheduler(optimizer)
 
         for i, data in enumerate(batch_generator_train):
@@ -291,11 +353,16 @@ def train(model_conf, train_conf, data_conf):
             optimizer.step()
             loss = loss_dict["loss"].item()
             curr_lr = [optimizer.param_groups[0]["lr"], optimizer.param_groups[1]["lr"]]
+            if weight_decay > 0:
+                curr_lr += [
+                    optimizer.param_groups[2]["lr"],
+                    optimizer.param_groups[3]["lr"],
+                ]
             lr_to_show = curr_lr[0] if len(curr_lr) == 1 else curr_lr
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={lr_to_show}")
 
         lr_backbone_history.append(curr_lr[0])
-        lr_head_history.append(curr_lr[1])
+        lr_head_history.append(curr_lr[-1])
 
         print(f"= = = = = = = = = =")
         if calculate_epoch_loss:
