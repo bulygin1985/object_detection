@@ -1,4 +1,5 @@
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -93,9 +94,15 @@ def compose_transforms(data_augmentation_params=None):
     )
 
 
-def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
+def calculate_validation_loss(
+    model, data, batch_size=32, num_workers=0, pin_memory=False
+):
     batch_generator = torch.utils.data.DataLoader(
-        data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+        data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
     )
     loss = 0.0
     count = 0
@@ -200,8 +207,13 @@ def train(model_conf, train_conf, data_conf):
 
     model.train(True)
 
+    pin_memory = train_conf.get("pin_memory", False)
     batch_generator_train = torch.utils.data.DataLoader(
-        train_data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+        train_data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
     )
 
     epoch = 1
@@ -213,6 +225,7 @@ def train(model_conf, train_conf, data_conf):
 
     while True:
         loss_dict = {}
+        tstart = time.perf_counter()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -232,10 +245,10 @@ def train(model_conf, train_conf, data_conf):
         if calculate_epoch_loss:
             last_lr = scheduler.get_last_lr()[0]
             train_validation_loss = calculate_validation_loss(
-                model, train_data, batch_size, num_workers
+                model, train_data, batch_size, num_workers, pin_memory=pin_memory
             )
             val_validation_loss = calculate_validation_loss(
-                model, val_data, batch_size, num_workers
+                model, val_data, batch_size, num_workers, pin_memory=pin_memory
             )
             train_loss_history.append(train_validation_loss)
             val_loss_history.append(val_validation_loss)
@@ -247,6 +260,9 @@ def train(model_conf, train_conf, data_conf):
                 }
             }
             log_stats(writer, epoch, last_lr, loss_stats)
+
+        elapsed = time.perf_counter() - tstart
+        print(f"epoch calculation time: {elapsed:.3f}")
 
         if criteria_satisfied(loss, epoch):
             break
