@@ -156,7 +156,7 @@ def filter_named_values_by_prefix(
 
 
 def train(model_conf, train_conf, data_conf):
-    torch.manual_seed(42)
+    #torch.manual_seed(42)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
@@ -280,6 +280,9 @@ def train(model_conf, train_conf, data_conf):
                 bb_train_params_patterns_include,
                 bb_train_params_patterns_exclude,
             )
+        else:
+            backbone_bn = [p for n, p in backbone_bn]
+            backbone_regular = [p for n, p in backbone_regular]
         opt_params = [
             {
                 "params": backbone_regular,
@@ -387,18 +390,11 @@ def train(model_conf, train_conf, data_conf):
             )
 
             best_val_loss_history.append(best_val_loss)
-            loss_df = pd.DataFrame(
-                {
-                    "epoch": range(1, epoch + 1),
-                    "train_loss": train_loss_history,
-                    "val_loss": val_loss_history,
-                    "best_val_loss": best_val_loss_history,
-                    "lr_head": lr_head_history,
-                    "lr_backbone": lr_backbone_history,
-                }
-            )
-            loss_df.to_csv("losses.csv", index=False)
 
+        print(
+            f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
+        )
+        print(f"= = = = = = = = = =")
         if criteria_satisfied(loss, epoch):
             break
 
@@ -406,10 +402,6 @@ def train(model_conf, train_conf, data_conf):
 
         if not pretrain:
             scheduler.step(check_loss_value)
-        print(
-            f"Epoch {epoch} calculation time is {time.perf_counter()-epoch_start} seconds"
-        )
-        print(f"= = = = = = = = = =")
         epoch += 1
 
     if calculate_epoch_loss:
@@ -417,6 +409,18 @@ def train(model_conf, train_conf, data_conf):
         best_idx = torch.argmin(tl).item()
         best_val = tl[best_idx].item()
         print(f"Best validation loss = {best_val} was reached at {best_idx+1} epoch.")
+
+    loss_df = pd.DataFrame(
+        {
+            "epoch": range(1, epoch + 1),
+            "train_loss": train_loss_history,
+            "val_loss": val_loss_history,
+            "best_val_loss": best_val_loss_history,
+            "lr_head": lr_head_history,
+            "lr_backbone": lr_backbone_history,
+        }
+    )
+    loss_df.to_csv("losses.csv", index=False)
 
     save_model(
         model,
