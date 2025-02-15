@@ -99,6 +99,7 @@ def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     )
     loss = 0.0
     count = 0
+    model.eval()
     with torch.no_grad():
         for i, data in enumerate(batch_generator):
             input_data, gt_data = data
@@ -212,7 +213,7 @@ def train(model_conf, train_conf, data_conf):
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
 
     while True:
-        loss_dict = {}
+        model.train()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()

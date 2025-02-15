@@ -78,6 +78,7 @@ def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
     )
     loss = 0.0
     count = 0
+    model.eval()
     with torch.no_grad():
         for i, data in enumerate(batch_generator):
             input_data, gt_data = data
@@ -201,7 +202,7 @@ def train(model_conf, train_conf, data_conf):
             epoch, logs={"lr": scheduler.get_last_lr()[0]}
         )
 
-        loss_dict = {}
+        model.train()
         for i, data in enumerate(batch_generator_train):
 
             tensorboard_callback.on_batch_begin(
