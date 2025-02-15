@@ -252,16 +252,39 @@ def train(model_conf, train_conf, data_conf):
     else:
         trainable_backbone_params = model.backbone.parameters()
 
-    def create_scheduler(optimizer):
-        return torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode="min",
-            factor=train_conf["lr_schedule"]["factor"],
-            patience=train_conf["lr_schedule"]["patience"],
-            threshold=1e-4,
-            threshold_mode="rel",
-            cooldown=1,
-            min_lr=train_conf["lr_schedule"]["min_lr"],
+    lr_schedule_conf = train_conf["lr_schedule"]
+    scheduler_type = lr_schedule_conf["type"]
+
+    def create_scheduler(optimizer, scheduler_conf):
+        scheduler_type = lr_schedule_conf["type"]
+        conf = lr_schedule_conf[scheduler_type]
+        if scheduler_type == "reduce_on_plato":
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode="min",
+                factor=conf["factor"],
+                patience=conf["patience"],
+                threshold=1e-4,
+                threshold_mode="rel",
+                cooldown=1,
+                min_lr=conf["min_lr"],
+            )
+        elif scheduler_type == "step":
+            return torch.optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=conf["step_size"],
+                gamma=conf["factor"],
+                last_epoch=conf.get("last_epoch", -1),
+            )
+        elif scheduler_type == "multi_step":
+            return torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                milestones=conf["milestones"],
+                gamma=conf["factor"],
+                last_epoch=conf.get("last_epoch", -1),
+            )
+        raise RuntimeError(
+            f"Unsupported learning rate scheduler type '{scheduler_type}'."
         )
 
     if head_pretrain_epochs:
@@ -333,6 +356,7 @@ def train(model_conf, train_conf, data_conf):
         shuffle=True,
         pin_memory=True,
         persistent_workers=True,
+        drop_last=train_conf.get("drop_last"),
     )
 
     epoch = 1
@@ -363,7 +387,7 @@ def train(model_conf, train_conf, data_conf):
                 else:
                     optimizer.param_groups[0]["lr"] = lr_backbone
                     optimizer.param_groups[1]["lr"] = lr_head
-            scheduler = create_scheduler(optimizer)
+            scheduler = create_scheduler(optimizer, lr_schedule_conf)
 
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
@@ -424,7 +448,10 @@ def train(model_conf, train_conf, data_conf):
         check_loss_value = train_loss_history[-1] if calculate_epoch_loss else loss
 
         if not pretrain:
-            scheduler.step(check_loss_value)
+            if scheduler_type == "reduce_on_plato":
+                scheduler.step(check_loss_value)
+            else:
+                scheduler.step()
         epoch += 1
 
     if calculate_epoch_loss:
