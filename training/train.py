@@ -15,28 +15,38 @@ from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def split_model_batchnorm_parameters(model):
+def split_params_for_weight_decay(model, decay_bias):
     """splits model named parameters into 'regular' and 'batch_norm' group."""
     names_all = set(model.state_dict().keys())
     result = []
     bn_param_tail = ".running_var"
 
-    def is_bn_name(name):
-        for suffix in [".bias", ".weight"]:
+    suffix_to_check = [".weight"]
+    if decay_bias:
+        suffix_to_check.append(".bias")
+
+    def should_decay_name(name):
+        if not decay_bias and name.endswith(".bias"):
+            return False
+        for suffix in suffix_to_check:
             if (
                 name.endswith(suffix)
                 and (name[: -len(suffix)] + bn_param_tail) in names_all
             ):
-                return True
-        return False
+                return False
+        return True
 
     result_named_params = list(
-        [(name, p) for name, p in model.named_parameters() if not is_bn_name(name)]
+        [(name, p) for name, p in model.named_parameters() if should_decay_name(name)]
     )
-    result_named_bn_params = list(
-        [(name, p) for name, p in model.named_parameters() if is_bn_name(name)]
+    result_named_nodecay_params = list(
+        [
+            (name, p)
+            for name, p in model.named_parameters()
+            if not should_decay_name(name)
+        ]
     )
-    return result_named_params, result_named_bn_params
+    return result_named_params, result_named_nodecay_params
 
 
 def criteria_builder(stop_loss, stop_epoch):
@@ -156,7 +166,7 @@ def filter_named_values_by_prefix(
 
 
 def train(model_conf, train_conf, data_conf):
-    #torch.manual_seed(42)
+    # torch.manual_seed(42)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
@@ -261,37 +271,50 @@ def train(model_conf, train_conf, data_conf):
         lr_head_start, lr_backbone_start = lr_head, lr_backbone
 
     weight_decay = train_conf.get("weight_decay")
+    weight_decay_bias = train_conf.get("weight_decay_bias", True)
     if weight_decay > 0:
-        regular_params, batchnorm_params = split_model_batchnorm_parameters(model)
-        head_regular = [p for n, p in regular_params if n.startswith("head.")]
-        head_bn = [p for n, p in batchnorm_params if n.startswith("head.")]
-        backbone_regular = [
-            (n, p) for n, p in regular_params if n.startswith("backbone.")
+        decay_params, nodecay_params = split_params_for_weight_decay(
+            model, weight_decay_bias
+        )
+        head_decay_params = [p for n, p in decay_params if n.startswith("head.")]
+        head_nodecay_params = [p for n, p in nodecay_params if n.startswith("head.")]
+        backbone_decay_params = [
+            (n, p) for n, p in decay_params if n.startswith("backbone.")
         ]
-        backbone_bn = [(n, p) for n, p in batchnorm_params if n.startswith("backbone.")]
+        backbone_nodecay_params = [
+            (n, p) for n, p in nodecay_params if n.startswith("backbone.")
+        ]
         if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
-            backbone_regular = filter_named_values_by_prefix(
-                backbone_regular,
+            backbone_decay_params = filter_named_values_by_prefix(
+                backbone_decay_params,
                 bb_train_params_patterns_include,
                 bb_train_params_patterns_exclude,
             )
-            backbone_bn = filter_named_values_by_prefix(
-                backbone_bn,
+            backbone_nodecay_params = filter_named_values_by_prefix(
+                backbone_nodecay_params,
                 bb_train_params_patterns_include,
                 bb_train_params_patterns_exclude,
             )
         else:
-            backbone_bn = [p for n, p in backbone_bn]
-            backbone_regular = [p for n, p in backbone_regular]
+            backbone_nodecay_params = [p for n, p in backbone_nodecay_params]
+            backbone_decay_params = [p for n, p in backbone_decay_params]
         opt_params = [
             {
-                "params": backbone_regular,
+                "params": backbone_decay_params,
                 "lr": lr_backbone_start,
                 "weight_decay": weight_decay,
             },
-            {"params": backbone_bn, "lr": lr_backbone_start, "weight_decay": 0.0},
-            {"params": head_regular, "lr": lr_head_start, "weight_decay": weight_decay},
-            {"params": head_bn, "lr": lr_head_start, "weight_decay": 0.0},
+            {
+                "params": backbone_nodecay_params,
+                "lr": lr_backbone_start,
+                "weight_decay": 0.0,
+            },
+            {
+                "params": head_decay_params,
+                "lr": lr_head_start,
+                "weight_decay": weight_decay,
+            },
+            {"params": head_nodecay_params, "lr": lr_head_start, "weight_decay": 0.0},
         ]
         print(f"applying weight decay = {weight_decay}")
     else:
