@@ -201,7 +201,11 @@ def train(model_conf, train_conf, data_conf):
     model.train(True)
 
     batch_generator_train = torch.utils.data.DataLoader(
-        train_data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+        train_data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        drop_last=train_conf.get("drop_last", False),
     )
 
     epoch = 1
