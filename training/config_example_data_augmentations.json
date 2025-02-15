@@ -26,7 +26,8 @@
         "random_resize_crop_scale": [0.5, 1.0],
         "random_resize_crop_ratio": [0.6667, 1.5],
         "color_jitter_brightness": 0.25
-    },    
+    },
+    "drop_last": true,
     "lr_schedule": {
       "patience": 3,
       "factor": 0.5,
