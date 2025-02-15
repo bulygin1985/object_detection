@@ -33,6 +33,7 @@
       "factor": 0.5,
       "min_lr": 2e-5
     },
+    "shuffle": true,
     "stop_criteria": {
       "loss": 1.0,
       "epoch": 125

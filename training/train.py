@@ -185,7 +185,7 @@ def train(model_conf, train_conf, data_conf):
         train_data,
         num_workers=num_workers,
         batch_size=batch_size,
-        shuffle=False,
+        shuffle=train_conf.get("shuffle", False),
         drop_last=train_conf.get("drop_last", False),
     )
 
