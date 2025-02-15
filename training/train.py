@@ -72,9 +72,15 @@ def main(config_path: str = None):
     train(model_conf, train_conf, data_conf)
 
 
-def calculate_validation_loss(model, data, batch_size=32, num_workers=0):
+def calculate_validation_loss(
+    model, data, batch_size=32, num_workers=0, pin_memory=False
+):
     batch_generator = torch.utils.data.DataLoader(
-        data, num_workers=num_workers, batch_size=batch_size, shuffle=False
+        data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
     )
     loss = 0.0
     count = 0
@@ -181,12 +187,14 @@ def train(model_conf, train_conf, data_conf):
 
     model.train(True)
 
+    pin_memory = train_conf.get("pin_memory", False)
     batch_generator_train = torch.utils.data.DataLoader(
         train_data,
         num_workers=num_workers,
         batch_size=batch_size,
-        shuffle=train_conf.get("shuffle", False),
         drop_last=train_conf.get("drop_last", False),
+        pin_memory=pin_memory,
+        shuffle=train_conf.get("shuffle", False),
     )
 
     epoch = 1
@@ -232,10 +240,10 @@ def train(model_conf, train_conf, data_conf):
 
             last_lr = scheduler.get_last_lr()[0]
             train_validation_loss = calculate_validation_loss(
-                model, train_data, batch_size, num_workers
+                model, train_data, batch_size, num_workers, pin_memory
             )
             val_validation_loss = calculate_validation_loss(
-                model, val_data, batch_size, num_workers
+                model, val_data, batch_size, num_workers, pin_memory
             )
             train_loss_history.append(train_validation_loss)
             val_loss_history.append(val_validation_loss)
