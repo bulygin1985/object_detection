@@ -1,4 +1,5 @@
 import argparse
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -210,7 +211,7 @@ def train(model_conf, train_conf, data_conf):
             epoch, logs={"lr": scheduler.get_last_lr()[0]}
         )
 
-        loss_dict = {}
+        tstart = time.perf_counter()
         for i, data in enumerate(batch_generator_train):
 
             tensorboard_callback.on_batch_begin(
@@ -256,6 +257,9 @@ def train(model_conf, train_conf, data_conf):
                     "lr": last_lr,
                 },
             )
+
+        elapsed = time.perf_counter() - tstart
+        print(f"Epoch calculation time: {elapsed:.3f}")
 
         if criteria_satisfied(
             train_validation_loss if calculate_epoch_loss else loss, epoch

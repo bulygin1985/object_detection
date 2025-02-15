@@ -225,7 +225,6 @@ def train(model_conf, train_conf, data_conf):
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
 
     while True:
-        loss_dict = {}
         tstart = time.perf_counter()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
