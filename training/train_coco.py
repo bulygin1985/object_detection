@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 import time
 from datetime import datetime
 from pathlib import Path
@@ -8,6 +10,7 @@ import torch
 import torchvision.transforms.v2 as transforms
 from torch.utils.tensorboard import SummaryWriter
 
+from callbacks.save_checkpoint import SaveCheckPoint
 from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
@@ -35,16 +38,6 @@ def log_stats(tensorboard_writer, epoch, lr, losses: dict):
     tensorboard_writer.add_scalar("Train/loss", train_validation_loss, epoch)
     tensorboard_writer.add_scalar("Val/loss", val_validation_loss, epoch)
     tensorboard_writer.add_scalar("Train/lr", lr, epoch)
-
-    # Verbose
-    print("= = = = = = = = = =")
-    print(
-        (
-            f"Epoch {epoch} train loss = {train_validation_loss},"
-            f"val loss = {val_validation_loss}"
-        )
-    )
-    print("= = = = = = = = = =")
 
 
 def save_model(model, weights_path: str = None, **kwargs):
@@ -122,21 +115,13 @@ def calculate_validation_loss(
     return loss / count
 
 
-def main(config_path: str = None):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, help="path to config file")
-    args = parser.parse_args()
-
-    filepath = args.config or config_path
-
-    model_conf, train_conf, data_conf = load_config(filepath)
-
-    train(model_conf, train_conf, data_conf)
-
-
-def train(model_conf, train_conf, data_conf):
+def train(config_filepath):
+    model_conf, train_conf, data_conf = load_config(config_filepath)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    writer = SummaryWriter(f"runs/training_{timestamp}")
+    run_folder = f"runs/training_{timestamp}"
+    os.makedirs(run_folder)
+    shutil.copy(config_filepath, run_folder)
+    writer = SummaryWriter(run_folder)
 
     image_set_train = "val" if train_conf["is_overfit"] else "train"
     image_set_val = "test" if train_conf["is_overfit"] else "val"
@@ -221,11 +206,24 @@ def train(model_conf, train_conf, data_conf):
 
     train_loss_history = []
     val_loss_history = []
+    best_val_loss_history = []
+    best_val_loss = float("inf")
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
+    save_best_model = train_conf.get("save_best_model", False)
+    save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
+    checkpoint_callback = None
+    if save_best_model:
+        checkpoint_callback = SaveCheckPoint(
+            model,
+            run_folder,
+            monitor="val_loss",
+            best_mode="min",
+            skip_epochs=save_best_model_skip_epochs,
+        )
 
     while True:
-        tstart = time.perf_counter()
+        epoch_start = time.perf_counter()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -242,7 +240,8 @@ def train(model_conf, train_conf, data_conf):
             curr_lr = scheduler.get_last_lr()[0]
             print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
 
-        if calculate_epoch_loss:
+        print("= = = = = = = = = =")
+        if calculate_epoch_loss or save_best_model:
             last_lr = scheduler.get_last_lr()[0]
             train_validation_loss = calculate_validation_loss(
                 model, train_data, batch_size, num_workers, pin_memory
@@ -252,6 +251,9 @@ def train(model_conf, train_conf, data_conf):
             )
             train_loss_history.append(train_validation_loss)
             val_loss_history.append(val_validation_loss)
+            if val_validation_loss < best_val_loss:
+                best_val_loss = val_validation_loss
+            best_val_loss_history.append(best_val_loss)
 
             loss_stats = {
                 "validation": {
@@ -260,10 +262,21 @@ def train(model_conf, train_conf, data_conf):
                 }
             }
             log_stats(writer, epoch, last_lr, loss_stats)
-
-        elapsed = time.perf_counter() - tstart
-        print(f"Epoch calculation time: {elapsed:.3f}")
-
+            print(
+                (
+                    f"Epoch {epoch} train loss = {train_validation_loss:.4f}, "
+                    f"val loss = {val_validation_loss:.4f}, "
+                    f"best val loss = {best_val_loss:.4f}"
+                )
+            )
+            if checkpoint_callback is not None:
+                checkpoint_callback.on_epoch_end(
+                    epoch, {"val_loss": val_validation_loss}
+                )
+        print(
+            f"Epoch calculation time is {time.perf_counter()-epoch_start:.2f} seconds"
+        )
+        print("= = = = = = = = = =")
         if criteria_satisfied(loss, epoch):
             break
 
@@ -276,18 +289,36 @@ def train(model_conf, train_conf, data_conf):
 
     save_model(
         model,
-        model_conf["weights_path"],
+        run_folder,
         tag=tag,
         backbone=model_conf["backbone"]["name"],
     )
+
+    if model_conf["weights_path"]:
+        save_model(
+            model,
+            model_conf["weights_path"],
+            tag=tag,
+            backbone=model_conf["backbone"]["name"],
+        )
 
     loss_df = pd.DataFrame(
         {
             "train_loss": train_loss_history,
             "val_loss": val_loss_history,
+            "best_val_loss": best_val_loss_history,
         }
     )
-    loss_df.to_csv(f"losses_{timestamp}.csv")
+    loss_df.to_csv(os.path.join(run_folder, "losses.csv"))
+
+
+def main(config_path: str = None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", type=str, help="path to config file")
+    args = parser.parse_args()
+
+    filepath = args.config or config_path
+    train(filepath)
 
 
 if __name__ == "__main__":
