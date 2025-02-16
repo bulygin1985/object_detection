@@ -262,6 +262,7 @@ def train(model_conf, train_conf, data_conf):
         print(
             f"Epoch calculation time is {time.perf_counter()-epoch_start:.2f} seconds"
         )
+        print("= = = = = = = = = =")
 
         if criteria_satisfied(
             train_validation_loss if calculate_epoch_loss else loss, epoch
