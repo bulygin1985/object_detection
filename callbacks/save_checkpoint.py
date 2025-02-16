@@ -49,6 +49,10 @@ class SaveCheckPoint:
                 and value <= self.best_metric_value
             ):
                 return
+            if self.best_metric_value is not None:
+                print(
+                    f"metric '{self.monitor_metric}' improved from {self.best_metric_value:.3f} to {value:.3f}"
+                )
             self.best_metric_value = value
             filename = self.filename.format(
                 epoch=epoch, metric=self.monitor_metric, value=value
