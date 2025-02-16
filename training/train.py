@@ -85,6 +85,7 @@ def calculate_validation_loss(
     )
     loss = 0.0
     count = 0
+    model.eval()
     with torch.no_grad():
         for i, data in enumerate(batch_generator):
             input_data, gt_data = data
@@ -206,12 +207,12 @@ def train(model_conf, train_conf, data_conf):
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
 
     while True:
+        epoch_start = time.perf_counter()
 
         tensorboard_callback.on_epoch_begin(
             epoch, logs={"lr": scheduler.get_last_lr()[0]}
         )
-
-        tstart = time.perf_counter()
+        model.train()
         for i, data in enumerate(batch_generator_train):
 
             tensorboard_callback.on_batch_begin(
@@ -258,8 +259,9 @@ def train(model_conf, train_conf, data_conf):
                 },
             )
 
-        elapsed = time.perf_counter() - tstart
-        print(f"Epoch calculation time: {elapsed:.3f}")
+        print(
+            f"Epoch calculation time is {time.perf_counter()-epoch_start:.2f} seconds"
+        )
 
         if criteria_satisfied(
             train_validation_loss if calculate_epoch_loss else loss, epoch

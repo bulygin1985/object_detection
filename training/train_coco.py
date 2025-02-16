@@ -99,6 +99,7 @@ def calculate_validation_loss(
     )
     loss = 0.0
     count = 0
+    model.eval()
     with torch.no_grad():
         for i, data in enumerate(batch_generator):
             input_data, gt_data = data
@@ -224,6 +225,7 @@ def train(config_filepath):
 
     while True:
         epoch_start = time.perf_counter()
+        model.train()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
