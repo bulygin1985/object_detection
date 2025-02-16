@@ -29,7 +29,9 @@
     "stop_criteria": {
       "loss": 1.0,
       "epoch": null
-    }
+    },
+    "save_best_model": true,
+    "save_best_model_skip_epochs": 20
   },
   "data": {
     "is_download": false,
