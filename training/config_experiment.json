@@ -39,7 +39,7 @@
     "num_workers": 8,
     "save_best_model": true,
     "skip_save_best_model_epochs": 70,
-    "weight_decay": 0.0001,
+    "weight_decay": 0.0,
     "weight_decay_bias": false,
     "data_augmentation": {
       "random_flip_horizontal": true,
@@ -47,15 +47,15 @@
       "random_resize_crop_ratio": [0.6667, 1.5]
     },
     "lr_schedule": {
-      "type": "step",
+      "type": "multi_step",
       "step": {
         "step_size": 1,
         "factor": 0.96,
         "last_epoch": -1
       },
       "multi_step": {
-        "milestones": [30,45,60,75],
-        "factor": 0.5  
+        "milestones": [20, 40, 60],
+        "factor": 0.1
       },
       "reduce_on_plato": {
         "patience": 3,
