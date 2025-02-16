@@ -26,12 +26,16 @@
         "random_resize_crop_scale": [0.5, 1.0],
         "random_resize_crop_ratio": [0.6667, 1.5],
         "color_jitter_brightness": 0.25
-    },    
+    },
+    "drop_last": true,
     "lr_schedule": {
       "patience": 3,
       "factor": 0.5,
       "min_lr": 2e-5
     },
+    "save_best_model": true,
+    "save_best_model_skip_epochs": 20,
+    "shuffle": true,
     "stop_criteria": {
       "loss": 1.0,
       "epoch": 125
