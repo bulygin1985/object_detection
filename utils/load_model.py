@@ -14,7 +14,7 @@ def create_model(
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
-        class_number=data_conf.get("class_amount"),
+        class_number=data_conf.get("class_amount", 20),
         backbone=model_conf["backbone"]["name"],
         backbone_weights=(
             model_conf["backbone"]["pretrained_weights"] if load_weights else None
