@@ -119,14 +119,7 @@ def compose_transforms(data_augmentation_params=None):
     )
 
 
-def calculate_loss(model, data, batch_size=32, num_workers=0):
-    batch_generator = torch.utils.data.DataLoader(
-        data,
-        num_workers=num_workers,
-        batch_size=batch_size,
-        shuffle=False,
-        pin_memory=True,
-    )
+def calculate_loss_batch_generator(model, batch_generator):
     loss = 0.0
     count = 0
     model.eval()
@@ -144,6 +137,17 @@ def calculate_loss(model, data, batch_size=32, num_workers=0):
             loss += curr_loss * curr_count
             count += curr_count
     return loss / count
+
+
+def calculate_loss(model, data, batch_size=32, num_workers=0):
+    batch_generator = torch.utils.data.DataLoader(
+        data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=True,
+    )
+    return calculate_loss_batch_generator(model, batch_generator)
 
 
 def name_fits(name, include_patterns=None, exclude_patterns=None):
@@ -349,6 +353,7 @@ def train(model_conf, train_conf, data_conf):
     optimizer = torch.optim.Adam(opt_params, lr=0.0)
 
     model.train(True)
+    persistent_workers = train_conf.get("persistent_workers", False)
 
     batch_generator_train = torch.utils.data.DataLoader(
         train_data,
@@ -356,7 +361,7 @@ def train(model_conf, train_conf, data_conf):
         batch_size=batch_size,
         shuffle=True,
         pin_memory=True,
-        persistent_workers=True,
+        persistent_workers=persistent_workers,
         drop_last=train_conf.get("drop_last"),
     )
 
@@ -372,6 +377,26 @@ def train(model_conf, train_conf, data_conf):
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
     save_best_model = train_conf.get("save_best_model", True)
     skip_save_best_model_epochs = train_conf.get("skip_save_best_model_epochs", 0)
+
+    num_workers_validation = train_conf.get("num_workers_validation", num_workers)
+    batch_size_val = train_conf.get("batch_size_val", batch_size)
+    if calculate_epoch_loss:
+        batch_generator_val = torch.utils.data.DataLoader(
+            val_data,
+            num_workers=num_workers_validation,
+            batch_size=batch_size_val,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=persistent_workers,
+        )
+        batch_generator_train_val = torch.utils.data.DataLoader(
+            train_data,
+            num_workers=num_workers_validation,
+            batch_size=batch_size_val,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=persistent_workers,
+        )
 
     while True:
         epoch_start = time.perf_counter()
@@ -418,10 +443,10 @@ def train(model_conf, train_conf, data_conf):
         print(f"= = = = = = = = = =")
         if calculate_epoch_loss:
             train_loss_history.append(
-                calculate_loss(model, train_data, batch_size, num_workers)
+                calculate_loss_batch_generator(model, batch_generator_train_val)
             )
             val_loss_history.append(
-                calculate_loss(model, val_data, batch_size, num_workers)
+                calculate_loss_batch_generator(model, batch_generator_val)
             )
             if val_loss_history[-1] < best_val_loss:
                 best_val_loss = val_loss_history[-1]
