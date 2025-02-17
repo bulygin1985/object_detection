@@ -27,6 +27,7 @@ def get_predictions(device, model, dataset, show_progress=False):
             pred = model(img)
 
         predictions.append(pred)
-        pbar.update(1)
+        if show_progress:
+            pbar.update(1)
 
     return predictions
