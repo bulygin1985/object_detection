@@ -11,6 +11,7 @@ import argparse
 import json
 from typing import Any
 
+import numpy as np
 import torch
 from config import load_config
 from load_model import load_model
@@ -113,28 +114,29 @@ def convert_predictions_to_coco_format(
         for img_info, pred in zip(imgs_info, preds):
             width_scale_factor = float(img_info["width"] / IMG_WIDTH)
             height_scale_factor = float(img_info["height"] / IMG_HEIGHT)
+            pred = pred.cpu().numpy()
 
             for category in range(num_categories):
                 for i in range(pred_shape[1]):
                     for j in range(pred_shape[2]):
+                        score = float(pred[category, i, j])
+                        if score < threshold:
+                            continue
                         box = pred[num_categories:, i, j].tolist()
-                        score = pred[category, i, j].item()
-                        if score >= threshold:
-                            results.append(
-                                {
-                                    "image_id": img_info["id"],
-                                    "category_id": category + 1,
-                                    "bbox": [
-                                        (j * output_stride_h - box[0])
-                                        * width_scale_factor,
-                                        (i * output_stride_w - box[1])
-                                        * height_scale_factor,
-                                        (box[2] + box[0]) * width_scale_factor,
-                                        (box[3] + box[1]) * height_scale_factor,
-                                    ],
-                                    "score": score,
-                                }
-                            )
+                        results.append(
+                            {
+                                "image_id": img_info["id"],
+                                "category_id": category + 1,
+                                "bbox": [
+                                    (j * output_stride_h - box[0]) * width_scale_factor,
+                                    (i * output_stride_w - box[1])
+                                    * height_scale_factor,
+                                    (box[2] + box[0]) * width_scale_factor,
+                                    (box[3] + box[1]) * height_scale_factor,
+                                ],
+                                "score": score,
+                            }
+                        )
             pbar.update(1)
 
     if output_file:
@@ -234,17 +236,21 @@ if __name__ == "__main__":
         args.set or args.ann_file
     ), "either 'set' org 'ann_file' arguments must be passed"
 
+    print("preparing dataset...")
     dataset = prepare_dataset(
         imgs_dir=imgs_dir,
         ann_file=ann_file,
         imgs_ids=imgs_ids_int,
     )
     dataset_transformed = transform_dataset(dataset["annotations"])
-    predictions = get_predictions(device, model, dataset_transformed)
+    print("generating predictions...")
+    predictions = get_predictions(
+        device, model, dataset_transformed, show_progress=True
+    )
     predictions = [pred.squeeze() for pred in predictions]
 
     num_categories = predictions[0].shape[0] - BBOX_PART_LEN
-
+    print("converting to coco format...")
     _ = convert_predictions_to_coco_format(
         dataset["images_info"],
         predictions,
