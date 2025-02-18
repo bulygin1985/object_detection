@@ -140,7 +140,7 @@ def train(config_filepath):
     train_transform = compose_transforms(train_conf.get("data_augmentation"))
     val_transform = compose_transforms()
     encoder = CenternetEncoder(
-        IMG_HEIGHT, IMG_WIDTH, n_classes=data_conf.get("class_amount")
+        IMG_HEIGHT, IMG_WIDTH, n_classes=data_conf.get("class_amount", 20)
     )
 
     train_data = Dataset(
@@ -173,7 +173,7 @@ def train(config_filepath):
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
-        class_number=data_conf.get("class_amount"),
+        class_number=data_conf.get("class_amount", 20),
         backbone=model_conf["backbone"]["name"],
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
