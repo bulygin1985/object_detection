@@ -380,6 +380,10 @@ def train(model_conf, train_conf, data_conf):
 
     num_workers_validation = train_conf.get("num_workers_validation", num_workers)
     batch_size_val = train_conf.get("batch_size_val", batch_size)
+    warmup_rate_scale = train_conf.get("warmup_rate_scale")
+    warmup_epochs = train_conf.get("warmup_epochs", 0)
+    batch_size_val = train_conf.get("batch_size_val", batch_size)
+
     if calculate_epoch_loss:
         batch_generator_val = torch.utils.data.DataLoader(
             val_data,
@@ -401,7 +405,16 @@ def train(model_conf, train_conf, data_conf):
     while True:
         epoch_start = time.perf_counter()
         pretrain = head_pretrain_epochs and epoch <= head_pretrain_epochs
-
+        if warmup_epochs and epoch <= warmup_epochs + 1:
+            # switch optimizer LRs
+            warmup_ratio = 1 - (1 - warmup_rate_scale) / warmup_epochs * (
+                warmup_epochs + 1 - epoch
+            )
+            optimizer.param_groups[0]["lr"] = lr_backbone_start * warmup_ratio
+            optimizer.param_groups[-1]["lr"] = lr_head_start * warmup_ratio
+            if weight_decay > 0:
+                optimizer.param_groups[1]["lr"] = optimizer.param_groups[0]["lr"]
+                optimizer.param_groups[2]["lr"] = optimizer.param_groups[-1]["lr"]
         if not pretrain and epoch == (head_pretrain_epochs + 1):
             if head_pretrain_epochs:
                 # switch optimizer LRs
