@@ -32,14 +32,20 @@
       "features.5"
     ],
     "batch_size": 32,
+    "batch_size_val": 16,
+    "batch_in_order": false,
     "drop_last": true,
     "subset_len": null,
     "val_subset_len": null,
     "calculate_epoch_loss": true,
     "num_workers": 8,
+    "num_workers_validation": 12,
+    "persistent_workers": true,
     "save_best_model": true,
-    "skip_save_best_model_epochs": 70,
-    "weight_decay": 0.0,
+    "skip_save_best_model_epochs": 90,
+    "warmup_epochs": 0,
+    "warmup_rate_scale": 0.05,
+    "weight_decay": 0.0004,
     "weight_decay_bias": false,
     "data_augmentation": {
       "random_flip_horizontal": true,
@@ -54,12 +60,12 @@
         "last_epoch": -1
       },
       "multi_step": {
-        "milestones": [20, 40, 60],
+        "milestones": [20, 40],
         "factor": 0.1
       },
       "reduce_on_plato": {
-        "patience": 3,
-        "factor": 0.2,
+        "patience": 4,
+        "factor": 0.1,
         "min_lr": 1e-5
       }
     },
