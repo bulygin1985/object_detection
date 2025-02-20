@@ -33,7 +33,6 @@
     ],
     "batch_size": 32,
     "batch_size_val": 16,
-    "batch_in_order": false,
     "drop_last": true,
     "subset_len": null,
     "val_subset_len": null,
@@ -60,12 +59,12 @@
         "last_epoch": -1
       },
       "multi_step": {
-        "milestones": [20, 40],
+        "milestones": [20, 40, 60],
         "factor": 0.1
       },
       "reduce_on_plato": {
-        "patience": 4,
-        "factor": 0.1,
+        "patience": 3,
+        "factor": 0.2,
         "min_lr": 1e-5
       }
     },
