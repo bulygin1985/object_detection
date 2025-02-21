@@ -159,6 +159,16 @@ def name_fits(name, include_patterns=None, exclude_patterns=None):
     return True
 
 
+def optimizer_type_by_str(name: str):
+    if name=="Adam":
+        return torch.optim.Adam
+    elif name=="AdamW":
+        return torch.optim.AdamW
+    elif name=="SGD":
+        return torch.optim.SGD
+    raise ValueError(f"optimizer '{name}' is not supported.")
+
+
 def filter_named_values_by_prefix(
     named_values, include_prefixes=None, exclude_prefixes=None
 ):
@@ -350,7 +360,9 @@ def train(model_conf, train_conf, data_conf):
             {"params": trainable_backbone_params, "lr": lr_backbone_start},
             {"params": model.head.parameters(), "lr": lr_head_start},
         ]
-    optimizer = torch.optim.Adam(opt_params, lr=0.0)
+    optimizer_type = optimizer_type_by_str(train_conf.get("optimizer", "Adam"))
+    print(f"using {optimizer_type} optimizer")
+    optimizer = optimizer_type(opt_params, lr=0.0)
 
     model.train(True)
     persistent_workers = train_conf.get("persistent_workers", False)
