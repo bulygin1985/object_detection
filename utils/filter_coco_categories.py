@@ -1,8 +1,7 @@
 import json
 import os
 import sys
-
-from typing import List, Dict
+from typing import Dict, List
 
 
 def filter_dict_array(data: List[Dict], key: str, categories: List[int]):
