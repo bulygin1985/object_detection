@@ -40,14 +40,19 @@ def log_stats(tensorboard_writer, epoch, lr, losses: dict):
     tensorboard_writer.add_scalar("Train/lr", lr, epoch)
 
 
-def save_model(model, weights_path: str = None, **kwargs):
+def extend_relative_path_to_parent(path):
+    if os.path.isabs(path):
+        return path
+    cur_dir = Path(__file__).resolve().parent
+    return os.path.join(cur_dir.parent, path)
+
+
+def save_model(model, weights_path: str, **kwargs):
     checkpoints_dir = weights_path or "models/checkpoints"
     tag = kwargs.get("tag", "train")
     backbone = kwargs.get("backbone", "default")
-    cur_dir = Path(__file__).resolve().parent
-
-    checkpoint_filename = (
-        cur_dir.parent / checkpoints_dir / f"pretrained_weights_{tag}_{backbone}.pt"
+    checkpoint_filename = os.path.join(
+        weights_path, f"pretrained_weights_{tag}_{backbone}.pt"
     )
 
     torch.save(model.state_dict(), checkpoint_filename)
@@ -119,7 +124,8 @@ def calculate_validation_loss(
 def train(config_filepath):
     model_conf, train_conf, data_conf = load_config(config_filepath)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_folder = f"runs/training_{timestamp}"
+    run_folder = extend_relative_path_to_parent(f"runs/training_{timestamp}")
+    print("run folder: ", run_folder)
     os.makedirs(run_folder)
     shutil.copy(config_filepath, run_folder)
     writer = SummaryWriter(run_folder)
@@ -299,7 +305,7 @@ def train(config_filepath):
     if model_conf["weights_path"]:
         save_model(
             model,
-            model_conf["weights_path"],
+            extend_relative_path_to_parent(model_conf["weights_path"]),
             tag=tag,
             backbone=model_conf["backbone"]["name"],
         )
