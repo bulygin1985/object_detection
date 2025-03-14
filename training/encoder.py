@@ -71,21 +71,25 @@ class CenternetEncoder:
             (self._out_height, self._out_width, self._n_classes), dtype=np.float32
         )
         coors = np.zeros((self._out_height, self._out_width, 4), dtype=np.float32)
-        for cls_id, bbox in zip(labels.data.numpy(), bboxes.data.numpy()):
-            box_s = bbox / self._down_ratio
-            h, w = box_s[3] - box_s[1], box_s[2] - box_s[0]
-            rad_w_class = int(np.round(gaussian_radius([h, w])))
-            rad_h_class = rad_w_class
-            if h > 0 and w > 0:
-                center = np.array(
-                    [(box_s[0] + box_s[2]) / 2, (box_s[1] + box_s[3]) / 2],
-                    dtype=np.float32,
-                )
-                center = np.round(center)
-                center = np.clip(
-                    center, [0, 0], [self._out_width - 1, self._out_height - 1]
-                )
-                center_int = center.astype(np.int32)
-                draw_gaussian(hm[..., cls_id - 1], center_int, rad_w_class, rad_h_class)
-                coors[center_int[1], center_int[0]] = bbox
+        assert len(labels) == len(bboxes)
+        if len(labels):
+            for cls_id, bbox in zip(labels.data.numpy(), bboxes.data.numpy()):
+                box_s = bbox / self._down_ratio
+                h, w = box_s[3] - box_s[1], box_s[2] - box_s[0]
+                rad_w_class = int(np.round(gaussian_radius([h, w])))
+                rad_h_class = rad_w_class
+                if h > 0 and w > 0:
+                    center = np.array(
+                        [(box_s[0] + box_s[2]) / 2, (box_s[1] + box_s[3]) / 2],
+                        dtype=np.float32,
+                    )
+                    center = np.round(center)
+                    center = np.clip(
+                        center, [0, 0], [self._out_width - 1, self._out_height - 1]
+                    )
+                    center_int = center.astype(np.int32)
+                    draw_gaussian(
+                        hm[..., cls_id - 1], center_int, rad_w_class, rad_h_class
+                    )
+                    coors[center_int[1], center_int[0]] = bbox
         return np.concatenate((hm, coors), axis=-1)
