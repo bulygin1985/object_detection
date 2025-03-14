@@ -15,9 +15,9 @@ def filter_coco_annotation_dict(data, categories):
 
 
 def main():
-    if len(sys.argv) <= 1:
+    if len(sys.argv) != 3:
         print(
-            "filter_coco_categies. Usage:\n python filter_coco_categies.py <input_filename> <categories_list>"
+            "filter_coco_categies.\nUsage:\n\tpython filter_coco_categies.py <input_filename> <categories_list>"
         )
         return
     fname_input = sys.argv[1]
