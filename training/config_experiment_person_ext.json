@@ -41,7 +41,7 @@
     "num_workers_validation": 12,
     "persistent_workers": true,
     "save_best_model": true,
-    "skip_save_best_model_epochs": 90,
+    "save_best_model_skip_epochs": 90,
     "warmup_epochs": 0,
     "warmup_rate_scale": 0.01,
     "weight_decay": 0.0004,
