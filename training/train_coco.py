@@ -47,7 +47,7 @@ def extend_relative_path_to_parent(path):
     return os.path.join(cur_dir.parent, path)
 
 
-def save_model(model, weights_path: str, tag="train", backbone="default"):
+def save_model(model, weights_path: str, tag: str = "train", backbone: str = "default"):
     checkpoint_filename = os.path.join(
         weights_path, f"pretrained_weights_{tag}_{backbone}.pt"
     )
