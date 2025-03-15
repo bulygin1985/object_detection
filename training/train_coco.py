@@ -47,10 +47,7 @@ def extend_relative_path_to_parent(path):
     return os.path.join(cur_dir.parent, path)
 
 
-def save_model(model, weights_path: str, **kwargs):
-    checkpoints_dir = weights_path or "models/checkpoints"
-    tag = kwargs.get("tag", "train")
-    backbone = kwargs.get("backbone", "default")
+def save_model(model, weights_path: str, tag="train", backbone="default"):
     checkpoint_filename = os.path.join(
         weights_path, f"pretrained_weights_{tag}_{backbone}.pt"
     )
@@ -175,12 +172,12 @@ def train(config_filepath):
         val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
-
+    backbone_name = model_conf["backbone"]["name"]
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
         class_number=data_conf.get("class_amount", 20),
-        backbone=model_conf["backbone"]["name"],
+        backbone=backbone_name,
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
@@ -294,20 +291,14 @@ def train(config_filepath):
         epoch += 1
 
     writer.close()
-
-    save_model(
-        model,
-        run_folder,
-        tag=tag,
-        backbone=model_conf["backbone"]["name"],
-    )
+    save_model(model, run_folder, tag, backbone_name)
 
     if model_conf["weights_path"]:
         save_model(
             model,
             extend_relative_path_to_parent(model_conf["weights_path"]),
-            tag=tag,
-            backbone=model_conf["backbone"]["name"],
+            tag,
+            backbone_name,
         )
 
     loss_df = pd.DataFrame(
