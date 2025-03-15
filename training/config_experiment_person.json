@@ -16,24 +16,41 @@
   },
   "train": {
     "is_overfit": false,
-    "lr": 2e-2,
-    "batch_size": 32,
+    "lr": 1e-2,
+    "batch_size": 64,
     "subset_len": null,
     "val_subset_len": null,
     "calculate_epoch_loss": true,
+    "num_workers": 8,    
     "data_augmentation": {
         "random_flip_horizontal": true,
         "random_resize_crop_scale": [0.5, 1.0],
-        "random_resize_crop_ratio": [0.6667, 1.5],
-        "color_jitter_brightness": 0.25
+        "random_resize_crop_ratio": [0.6667, 1.5]
     },
     "drop_last": true,
     "lr_schedule": {
-      "patience": 3,
-      "factor": 0.5,
-      "min_lr": 2e-5
+        "type": "reduce_on_plato",
+        "step": {
+          "step_size": 1,
+          "factor": 0.96,
+          "last_epoch": -1
+        },
+        "multi_step": {
+          "milestones": [50, 80],
+          "factor": 0.1
+        },
+        "reduce_on_plato": {
+          "patience": 3,
+          "factor": 0.1,
+          "min_lr": 1e-5
+        }
+      },
+      "stop_criteria": {
+        "loss": null,
+        "epoch": 175
+      }
     },
-    "save_best_model": true,
+      "save_best_model": true,
     "save_best_model_skip_epochs": 20,
     "shuffle": true,
     "stop_criteria": {
