@@ -40,14 +40,16 @@ def log_stats(tensorboard_writer, epoch, lr, losses: dict):
     tensorboard_writer.add_scalar("Train/lr", lr, epoch)
 
 
-def save_model(model, weights_path: str = None, **kwargs):
-    checkpoints_dir = weights_path or "models/checkpoints"
-    tag = kwargs.get("tag", "train")
-    backbone = kwargs.get("backbone", "default")
+def extend_relative_path_to_parent(path):
+    if os.path.isabs(path):
+        return path
     cur_dir = Path(__file__).resolve().parent
+    return os.path.join(cur_dir.parent, path)
 
-    checkpoint_filename = (
-        cur_dir.parent / checkpoints_dir / f"pretrained_weights_{tag}_{backbone}.pt"
+
+def save_model(model, weights_path: str, tag: str = "train", backbone: str = "default"):
+    checkpoint_filename = os.path.join(
+        weights_path, f"pretrained_weights_{tag}_{backbone}.pt"
     )
 
     torch.save(model.state_dict(), checkpoint_filename)
@@ -119,7 +121,8 @@ def calculate_validation_loss(
 def train(config_filepath):
     model_conf, train_conf, data_conf = load_config(config_filepath)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_folder = f"runs/training_{timestamp}"
+    run_folder = extend_relative_path_to_parent(f"runs/training_{timestamp}")
+    print("run folder: ", run_folder)
     os.makedirs(run_folder)
     shutil.copy(config_filepath, run_folder)
     writer = SummaryWriter(run_folder)
@@ -169,12 +172,12 @@ def train(config_filepath):
         val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
     criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
-
+    backbone_name = model_conf["backbone"]["name"]
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
         alpha=model_conf["alpha"],
         class_number=data_conf.get("class_amount", 20),
-        backbone=model_conf["backbone"]["name"],
+        backbone=backbone_name,
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
@@ -288,20 +291,14 @@ def train(config_filepath):
         epoch += 1
 
     writer.close()
-
-    save_model(
-        model,
-        run_folder,
-        tag=tag,
-        backbone=model_conf["backbone"]["name"],
-    )
+    save_model(model, run_folder, tag, backbone_name)
 
     if model_conf["weights_path"]:
         save_model(
             model,
-            model_conf["weights_path"],
-            tag=tag,
-            backbone=model_conf["backbone"]["name"],
+            extend_relative_path_to_parent(model_conf["weights_path"]),
+            tag,
+            backbone_name,
         )
 
     loss_df = pd.DataFrame(
