@@ -15,16 +15,17 @@ from data.dataset import Dataset
 from data.dataset_loaders import MSCOCODatasetLoader
 from models.centernet import ModelBuilder
 from training.encoder import CenternetEncoder
+from training.train_utils import *
 from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def criteria_builder(stop_loss, stop_epoch):
+def criteria_builder(loss, epoch):
     def criteria_satisfied(current_loss, current_epoch):
-        if stop_loss is not None and current_loss < stop_loss:
+        if loss is not None and current_loss < loss:
             return True
-        if stop_epoch is not None and current_epoch >= stop_epoch:
+        if epoch is not None and current_epoch >= epoch:
             return True
         return False
 
@@ -89,20 +90,11 @@ def compose_transforms(data_augmentation_params=None):
     )
 
 
-def calculate_validation_loss(
-    model, data, batch_size=32, num_workers=0, pin_memory=False
-):
-    batch_generator = torch.utils.data.DataLoader(
-        data,
-        num_workers=num_workers,
-        batch_size=batch_size,
-        shuffle=False,
-        pin_memory=pin_memory,
-    )
+def calculate_loss_on_batch_generator(model, batch_generator):
     loss = 0.0
     count = 0
     model.eval()
-    with torch.no_grad():
+    with torch.no_grad() as ng:
         for i, data in enumerate(batch_generator):
             input_data, gt_data = data
             input_data = input_data.to(device).contiguous()
@@ -116,6 +108,19 @@ def calculate_validation_loss(
             loss += curr_loss * curr_count
             count += curr_count
     return loss / count
+
+
+def calculate_validation_loss(
+    model, data, batch_size=32, num_workers=0, pin_memory=False
+):
+    batch_generator = torch.utils.data.DataLoader(
+        data,
+        num_workers=num_workers,
+        batch_size=batch_size,
+        shuffle=False,
+        pin_memory=pin_memory,
+    )
+    return calculate_loss_on_batch_generator(model, batch_generator)
 
 
 def train(config_filepath):
@@ -165,13 +170,14 @@ def train(config_filepath):
 
     if train_conf["is_overfit"]:
         tag = "overfit"
+        assert train_subset_len is not None
         batch_size = train_subset_len
     if train_subset_len is not None:
         train_data = torch.utils.data.Subset(train_data, range(train_subset_len))
     if val_subset_len is not None:
         val_data = torch.utils.data.Subset(val_data, range(val_subset_len))
 
-    criteria_satisfied = criteria_builder(*train_conf["stop_criteria"].values())
+    criteria_satisfied = criteria_builder(**train_conf["stop_criteria"])
     backbone_name = model_conf["backbone"]["name"]
     model = ModelBuilder(
         filters_size=model_conf["head"]["filters_size"],
@@ -181,29 +187,109 @@ def train(config_filepath):
         backbone_weights=model_conf["backbone"]["pretrained_weights"],
     ).to(device)
 
-    parameters = list(model.parameters())
-    optimizer = torch.optim.Adam(parameters, lr=train_conf["lr"])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode="min",
-        factor=train_conf["lr_schedule"]["factor"],
-        patience=train_conf["lr_schedule"]["patience"],
-        threshold=1e-4,
-        threshold_mode="rel",
-        cooldown=1,
-        min_lr=train_conf["lr_schedule"]["min_lr"],
+    lr = train_conf["lr"]
+    lr_backbone = train_conf.get("lr_backbone", lr)
+    lr_head = train_conf.get("lr_head", lr)
+
+    head_pretrain_epochs = train_conf.get("head_pretrain_epochs")
+
+    bb_train_params_patterns_include = train_conf.get(
+        "backbone_trainable_params_patterns_include"
     )
+    bb_train_params_patterns_exclude = train_conf.get(
+        "backbone_trainable_params_patterns_exclude"
+    )
+    if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
+        trainable_backbone_params = filter_named_values_by_pattern(
+            model.backbone.named_parameters(),
+            bb_train_params_patterns_include,
+            bb_train_params_patterns_exclude,
+        )
+        print("Filter backbone trainable parameters:")
+        print(f"   include: {bb_train_params_patterns_include}")
+        print(f"   exclude: {bb_train_params_patterns_exclude}")
+        print(
+            f"   trainable {len(trainable_backbone_params)} of {len(list(model.backbone.parameters()))}"
+        )
+    else:
+        trainable_backbone_params = model.backbone.parameters()
+
+    lr_schedule_conf = train_conf["lr_schedule"]
+    scheduler_type = lr_schedule_conf["type"]
+
+    if head_pretrain_epochs:
+        lr_head_start = train_conf.get("lr_head_pretrain", lr_head)
+        lr_backbone_start = 0.0
+    else:
+        lr_head_start, lr_backbone_start = lr_head, lr_backbone
+
+    weight_decay = train_conf.get("weight_decay")
+    weight_decay_bias = train_conf.get("weight_decay_bias", True)
+    if weight_decay > 0:
+        decay_params, nodecay_params = split_params_for_weight_decay(
+            model, weight_decay_bias
+        )
+        head_decay_params = [p for n, p in decay_params if n.startswith("head.")]
+        head_nodecay_params = [p for n, p in nodecay_params if n.startswith("head.")]
+        backbone_decay_params = [
+            (n, p) for n, p in decay_params if n.startswith("backbone.")
+        ]
+        backbone_nodecay_params = [
+            (n, p) for n, p in nodecay_params if n.startswith("backbone.")
+        ]
+        if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
+            backbone_decay_params = filter_named_values_by_pattern(
+                backbone_decay_params,
+                bb_train_params_patterns_include,
+                bb_train_params_patterns_exclude,
+            )
+            backbone_nodecay_params = filter_named_values_by_pattern(
+                backbone_nodecay_params,
+                bb_train_params_patterns_include,
+                bb_train_params_patterns_exclude,
+            )
+        else:
+            backbone_nodecay_params = [p for n, p in backbone_nodecay_params]
+            backbone_decay_params = [p for n, p in backbone_decay_params]
+        opt_params = [
+            {
+                "params": backbone_decay_params,
+                "lr": lr_backbone_start,
+                "weight_decay": weight_decay,
+            },
+            {
+                "params": backbone_nodecay_params,
+                "lr": lr_backbone_start,
+                "weight_decay": 0.0,
+            },
+            {
+                "params": head_decay_params,
+                "lr": lr_head_start,
+                "weight_decay": weight_decay,
+            },
+            {"params": head_nodecay_params, "lr": lr_head_start, "weight_decay": 0.0},
+        ]
+        print(f"applying weight decay = {weight_decay}")
+    else:
+        opt_params = [
+            {"params": trainable_backbone_params, "lr": lr_backbone_start},
+            {"params": model.head.parameters(), "lr": lr_head_start},
+        ]
+    optimizer_type = optimizer_type_by_str(train_conf.get("optimizer", "Adam"))
+    print(f"using {optimizer_type} optimizer")
+    optimizer = optimizer_type(opt_params, lr=0.0)
 
     model.train(True)
-
+    persistent_workers = train_conf.get("persistent_workers", False)
     pin_memory = train_conf.get("pin_memory", False)
     batch_generator_train = torch.utils.data.DataLoader(
         train_data,
         num_workers=num_workers,
         batch_size=batch_size,
-        drop_last=train_conf.get("drop_last", False),
-        pin_memory=pin_memory,
-        shuffle=train_conf.get("shuffle", False),
+        shuffle=True,
+        pin_memory=True,
+        persistent_workers=persistent_workers,
+        drop_last=train_conf.get("drop_last"),
     )
 
     epoch = 1
@@ -211,10 +297,12 @@ def train(config_filepath):
     train_loss_history = []
     val_loss_history = []
     best_val_loss_history = []
+    lr_head_history = []
+    lr_backbone_history = []
     best_val_loss = float("inf")
 
     calculate_epoch_loss = train_conf.get("calculate_epoch_loss")
-    save_best_model = train_conf.get("save_best_model", False)
+    save_best_model = train_conf.get("save_best_model", True)
     save_best_model_skip_epochs = train_conf.get("save_best_model_skip_epochs", 0)
     checkpoint_callback = None
     if save_best_model:
@@ -226,8 +314,55 @@ def train(config_filepath):
             skip_epochs=save_best_model_skip_epochs,
         )
 
+    num_workers_validation = train_conf.get("num_workers_validation", num_workers)
+    batch_size_val = train_conf.get("batch_size_val", batch_size)
+    warmup_rate_scale = train_conf.get("warmup_rate_scale")
+    warmup_epochs = train_conf.get("warmup_epochs", 0)
+    batch_size_val = train_conf.get("batch_size_val", batch_size)
+
+    if calculate_epoch_loss:
+        batch_generator_val = torch.utils.data.DataLoader(
+            val_data,
+            num_workers=num_workers_validation,
+            batch_size=batch_size_val,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=persistent_workers,
+        )
+        batch_generator_train_val = torch.utils.data.DataLoader(
+            train_data,
+            num_workers=num_workers_validation,
+            batch_size=batch_size_val,
+            shuffle=False,
+            pin_memory=True,
+            persistent_workers=persistent_workers,
+        )
+
     while True:
         epoch_start = time.perf_counter()
+        pretrain = head_pretrain_epochs and epoch <= head_pretrain_epochs
+        if warmup_epochs and epoch <= warmup_epochs + 1:
+            # switch optimizer LRs
+            warmup_ratio = 1 - (1 - warmup_rate_scale) / warmup_epochs * (
+                warmup_epochs + 1 - epoch
+            )
+            optimizer.param_groups[0]["lr"] = lr_backbone_start * warmup_ratio
+            optimizer.param_groups[-1]["lr"] = lr_head_start * warmup_ratio
+            if weight_decay > 0:
+                optimizer.param_groups[1]["lr"] = optimizer.param_groups[0]["lr"]
+                optimizer.param_groups[2]["lr"] = optimizer.param_groups[-1]["lr"]
+        if not pretrain and epoch == (head_pretrain_epochs + 1):
+            if head_pretrain_epochs:
+                # switch optimizer LRs
+                if weight_decay > 0:
+                    optimizer.param_groups[0]["lr"] = lr_backbone
+                    optimizer.param_groups[1]["lr"] = lr_backbone
+                    optimizer.param_groups[2]["lr"] = lr_head
+                    optimizer.param_groups[3]["lr"] = lr_head
+                else:
+                    optimizer.param_groups[0]["lr"] = lr_backbone
+                    optimizer.param_groups[1]["lr"] = lr_head
+            scheduler = create_scheduler(optimizer, lr_schedule_conf)
         model.train()
         for i, data in enumerate(batch_generator_train):
             input_data, gt_data = data
@@ -237,17 +372,26 @@ def train(config_filepath):
             gt_data.requires_grad = False
 
             loss_dict = model(input_data, gt=gt_data)
-            optimizer.zero_grad()
+            optimizer.zero_grad()  # compute gradient and do optimize step
             loss_dict["loss"].backward()
 
             optimizer.step()
             loss = loss_dict["loss"].item()
-            curr_lr = scheduler.get_last_lr()[0]
-            print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={curr_lr}")
+            curr_lr = [optimizer.param_groups[0]["lr"], optimizer.param_groups[1]["lr"]]
+            if weight_decay > 0:
+                curr_lr += [
+                    optimizer.param_groups[2]["lr"],
+                    optimizer.param_groups[3]["lr"],
+                ]
+            lr_to_show = curr_lr[0] if len(curr_lr) == 1 else curr_lr
+            print(f"Epoch {epoch}, batch {i}, loss={loss:.3f}, lr={lr_to_show}")
+
+        lr_backbone_history.append(curr_lr[0])
+        lr_head_history.append(curr_lr[-1])
 
         print("= = = = = = = = = =")
         if calculate_epoch_loss or save_best_model:
-            last_lr = scheduler.get_last_lr()[0]
+            last_lr = optimizer.param_groups[-1]["lr"]
             train_validation_loss = calculate_validation_loss(
                 model, train_data, batch_size, num_workers, pin_memory
             )
@@ -287,10 +431,21 @@ def train(config_filepath):
 
         check_loss_value = train_validation_loss if calculate_epoch_loss else loss
 
-        scheduler.step(check_loss_value)
+        if not pretrain:
+            if scheduler_type == "reduce_on_plato":
+                scheduler.step(check_loss_value)
+            else:
+                scheduler.step()
         epoch += 1
 
     writer.close()
+
+    if calculate_epoch_loss:
+        tl = torch.Tensor(val_loss_history)
+        best_idx = torch.argmin(tl).item()
+        best_val = tl[best_idx].item()
+        print(f"Best validation loss = {best_val} was reached at {best_idx+1} epoch.")
+
     save_model(model, run_folder, tag, backbone_name)
 
     if model_conf["weights_path"]:
@@ -303,12 +458,15 @@ def train(config_filepath):
 
     loss_df = pd.DataFrame(
         {
+            "epoch": range(1, epoch + 1),
             "train_loss": train_loss_history,
             "val_loss": val_loss_history,
             "best_val_loss": best_val_loss_history,
+            "lr_head": lr_head_history,
+            "lr_backbone": lr_backbone_history,
         }
     )
-    loss_df.to_csv(os.path.join(run_folder, "losses.csv"))
+    loss_df.to_csv("losses.csv", index=False)
 
 
 def main(config_path: str = None):
