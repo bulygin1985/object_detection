@@ -10,43 +10,10 @@ import torchvision.transforms.v2 as transforms
 from data.dataset import Dataset
 from models.centernet import ModelBuilder
 from training.encoder import CenternetEncoder
+from training.train_utils import *
 from utils.config import IMG_HEIGHT, IMG_WIDTH, load_config
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def split_params_for_weight_decay(model, decay_bias):
-    """splits model named parameters into 'regular' and 'batch_norm' group."""
-    names_all = set(model.state_dict().keys())
-    result = []
-    bn_param_tail = ".running_var"
-
-    suffix_to_check = [".weight"]
-    if decay_bias:
-        suffix_to_check.append(".bias")
-
-    def should_decay_name(name):
-        if not decay_bias and name.endswith(".bias"):
-            return False
-        for suffix in suffix_to_check:
-            if (
-                name.endswith(suffix)
-                and (name[: -len(suffix)] + bn_param_tail) in names_all
-            ):
-                return False
-        return True
-
-    result_named_params = list(
-        [(name, p) for name, p in model.named_parameters() if should_decay_name(name)]
-    )
-    result_named_nodecay_params = list(
-        [
-            (name, p)
-            for name, p in model.named_parameters()
-            if not should_decay_name(name)
-        ]
-    )
-    return result_named_params, result_named_nodecay_params
 
 
 def criteria_builder(stop_loss, stop_epoch):
@@ -150,36 +117,6 @@ def calculate_loss(model, data, batch_size=32, num_workers=0):
     return calculate_loss_batch_generator(model, batch_generator)
 
 
-def name_fits(name, include_patterns=None, exclude_patterns=None):
-    """Check if name has any of include prefixes and does not have all exclude prefixes."""
-    if include_patterns and not any([p in name for p in include_patterns]):
-        return False
-    if exclude_patterns and not all([p not in name for p in exclude_patterns]):
-        return False
-    return True
-
-
-def optimizer_type_by_str(name: str):
-    if name=="Adam":
-        return torch.optim.Adam
-    elif name=="AdamW":
-        return torch.optim.AdamW
-    elif name=="SGD":
-        return torch.optim.SGD
-    raise ValueError(f"optimizer '{name}' is not supported.")
-
-
-def filter_named_values_by_prefix(
-    named_values, include_prefixes=None, exclude_prefixes=None
-):
-    """Filter sequence (name, value) for name to have one of prefixes and none of exclude prefixes."""
-    return [
-        p
-        for name, p in named_values
-        if name_fits(name, include_prefixes, exclude_prefixes)
-    ]
-
-
 def train(model_conf, train_conf, data_conf):
     # torch.manual_seed(42)
 
@@ -253,7 +190,7 @@ def train(model_conf, train_conf, data_conf):
         "backbone_trainable_params_patterns_exclude"
     )
     if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
-        trainable_backbone_params = filter_named_values_by_prefix(
+        trainable_backbone_params = filter_named_values_by_pattern(
             model.backbone.named_parameters(),
             bb_train_params_patterns_include,
             bb_train_params_patterns_exclude,
@@ -269,38 +206,6 @@ def train(model_conf, train_conf, data_conf):
 
     lr_schedule_conf = train_conf["lr_schedule"]
     scheduler_type = lr_schedule_conf["type"]
-
-    def create_scheduler(optimizer, scheduler_conf):
-        scheduler_type = lr_schedule_conf["type"]
-        conf = lr_schedule_conf[scheduler_type]
-        if scheduler_type == "reduce_on_plato":
-            return torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
-                mode="min",
-                factor=conf["factor"],
-                patience=conf["patience"],
-                threshold=1e-4,
-                threshold_mode="rel",
-                cooldown=1,
-                min_lr=conf["min_lr"],
-            )
-        elif scheduler_type == "step":
-            return torch.optim.lr_scheduler.StepLR(
-                optimizer,
-                step_size=conf["step_size"],
-                gamma=conf["factor"],
-                last_epoch=conf.get("last_epoch", -1),
-            )
-        elif scheduler_type == "multi_step":
-            return torch.optim.lr_scheduler.MultiStepLR(
-                optimizer,
-                milestones=conf["milestones"],
-                gamma=conf["factor"],
-                last_epoch=conf.get("last_epoch", -1),
-            )
-        raise RuntimeError(
-            f"Unsupported learning rate scheduler type '{scheduler_type}'."
-        )
 
     if head_pretrain_epochs:
         lr_head_start = train_conf.get("lr_head_pretrain", lr_head)
@@ -323,12 +228,12 @@ def train(model_conf, train_conf, data_conf):
             (n, p) for n, p in nodecay_params if n.startswith("backbone.")
         ]
         if bb_train_params_patterns_exclude or bb_train_params_patterns_include:
-            backbone_decay_params = filter_named_values_by_prefix(
+            backbone_decay_params = filter_named_values_by_pattern(
                 backbone_decay_params,
                 bb_train_params_patterns_include,
                 bb_train_params_patterns_exclude,
             )
-            backbone_nodecay_params = filter_named_values_by_prefix(
+            backbone_nodecay_params = filter_named_values_by_pattern(
                 backbone_nodecay_params,
                 bb_train_params_patterns_include,
                 bb_train_params_patterns_exclude,
