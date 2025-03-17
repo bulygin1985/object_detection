@@ -466,7 +466,7 @@ def train(config_filepath):
             "lr_backbone": lr_backbone_history,
         }
     )
-    loss_df.to_csv("losses.csv", index=False)
+    loss_df.to_csv(os.path.join(run_folder, "losses.csv"), index=False)
 
 
 def main(config_path: str = None):
