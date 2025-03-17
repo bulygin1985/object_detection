@@ -12,7 +12,7 @@ def filter_dict_array(data: List[Dict], key: str, categories: List[int]):
     return new_data
 
 
-def filter_coco_annotation_dict(data: Dict, categories: List[int]):
+def filter_coco_annotation_dict(data: Dict, categories: List[int], keep_empty=False):
     """Filter coco annotations data dict with specified categories
     Args:
         data (dict): dictionary of coco annotations
@@ -21,10 +21,14 @@ def filter_coco_annotation_dict(data: Dict, categories: List[int]):
         dict with only only specified categories in annotations and categories.
     """
     result = data.copy()
-    result["annotations"] = filter_dict_array(
-        data["annotations"], "category_id", categories
-    )
+    new_annotations = filter_dict_array(data["annotations"], "category_id", categories)
+    result["annotations"] = new_annotations
     result["categories"] = filter_dict_array(data["categories"], "id", categories)
+    if not keep_empty:
+        used_image_ids = {anno["image_id"] for anno in new_annotations}
+        images = data["images"]
+        new_images = [image for image in images if image["id"] in used_image_ids]
+        result["images"] = new_images
     return result
 
 
