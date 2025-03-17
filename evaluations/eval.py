@@ -153,13 +153,13 @@ class MAPEvaluator:
 
 if __name__ == "__main__":
     evaluator = MAPEvaluator(
-        ground_truth_annotations="../VOC_COCO/pascal_trainval2007.json",
-        model_predictions="../VOC_COCO/pascal_train2007_predictions.json",
+        ground_truth_annotations="../PASCAL_COCO/pascal_train2007_filtered_15.json",
+        model_predictions="/home/kyrylogr/projects/learning/object_detection/runs/training_20250316_204539/pred_train.json",
     )
 
     # the list [12, 17, 23, 26, 32, 33, 34, 35, 36, 42] contains first 10 image ids of train pascal VOC dataset
-    evaluator.filter_input(
-        img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None
-    )
+    #evaluator.filter_input(
+    #    img_ids=[12, 17, 23, 26, 32, 33, 34, 35, 36, 42], cat_ids=None
+    #)
 
     _ = evaluator.evaluate()

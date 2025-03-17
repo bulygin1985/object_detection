@@ -17,6 +17,7 @@ class ObjectDetectionVisualizer:
         input_width=256,
         down_ratio=4,
         confidence_threshold=0.3,
+        num_classes=20
     ):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
@@ -29,13 +30,14 @@ class ObjectDetectionVisualizer:
         self.input_width = input_width
         self.down_ratio = down_ratio
         self.confidence_threshold = confidence_threshold
+        self.num_classes = num_classes
 
         self._setup()
 
     def _setup(self):
         try:
             self.postprocessor = CenternetPostprocess(
-                n_classes=20,
+                n_classes=self.num_classes,
                 width=self.input_width,
                 height=self.input_height,
                 down_ratio=self.down_ratio,
@@ -118,7 +120,7 @@ class ObjectDetectionVisualizer:
         for i, (orig_img, _) in enumerate(self.dataset):
             pred = preds[i]
 
-            heatmaps = pred[:, :20]
+            heatmaps = pred[:, :self.num_classes]
             colored_heatmap = self._get_heatmap_visualization(heatmaps)
             detections = self.postprocessor(pred)
 
